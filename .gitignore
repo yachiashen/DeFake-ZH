@@ -17,6 +17,8 @@ venv/
 Pipfile
 Pipfile.lock
 poetry.lock
+conda/
+.conda/
 
 # IDE settings (VSCode, PyCharm)
 .vscode/
@@ -32,3 +34,6 @@ poetry.lock
 *.log
 *.sqlite3
 *.db
+
+# other
+*.csv
