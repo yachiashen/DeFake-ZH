@@ -76,14 +76,22 @@ if __name__ == "__main__":
     # title = input("標題：")
     # content = input("內容：")
     # predict_news(title, content)
-    try:
-        df = pd.read_csv("testing_news.csv", header=None)
-        if len(df) < 2:
-            raise ValueError("檔案內容不足，請至少提供兩列資料。")
-        title = str(df.iloc[0, 0])
-        content = str(df.iloc[1, 0])
-        predict_news(title, content)
-    except FileNotFoundError:
-        print("找不到檔案：testing_news.csv，請確認檔案是否存在於同一目錄下。")
-    except Exception as e:
-        print("讀取 CSV 過程發生錯誤：", str(e))
+    # try:
+    #     df = pd.read_csv("testing_news.csv", header=None)
+    #     if len(df) < 2:
+    #         raise ValueError("檔案內容不足，請至少提供兩列資料。")
+    #     title = str(df.iloc[0, 0])
+    #     content = str(df.iloc[1, 0])
+    #     predict_news(title, content)
+    # except FileNotFoundError:
+    #     print("找不到檔案：testing_news.csv，請確認檔案是否存在於同一目錄下。")
+    # except Exception as e:
+    #     print("讀取 CSV 過程發生錯誤：", str(e))
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Predict whether a news article is fake or real.")
+    parser.add_argument("--title", type=str, required=True, help="News title")
+    parser.add_argument("--content", type=str, required=True, help="News content")
+    args = parser.parse_args()
+    
+    predict_news(args.title, args.content)
