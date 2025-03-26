@@ -1,0 +1,17 @@
+name: defake-zh
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.12.9
+  - pip
+  - pip:
+      - numpy
+      - pandas
+      - scikit-learn
+      - jieba
+      - torch
+      - torchvision
+      - torchaudio
+      - transformers
+      - tqdm
