@@ -3,6 +3,7 @@ import re
 import torch
 import json
 import datetime
+import emoji
 import opencc
 import pandas as pd
 
@@ -135,7 +136,7 @@ def insert_true_news(news_database: NewsBase, ltp_model: LTP, title: str, conten
                 entity.add_link(text_node)
     return
 
-## 用該年該月的新聞建立新聞資料庫
+## 建立該年該月的新聞資料庫
 def build_all_json_news(word_model: CustomWordEmbedding, sentence_model: CustomSentenceEmbedding, ltp_model:LTP, \
                     reference_news_folder_path: str, news_db_folder_path: str, year_month: datetime.date):
     
@@ -182,9 +183,51 @@ def build_all_json_news(word_model: CustomWordEmbedding, sentence_model: CustomS
     return 
 
 ## 建立 MGP 資料庫
-def build_mgp_db(word_model: CustomWordEmbedding, sentence_model: CustomSentenceEmbedding, ltp_model: LTP):
-    pass
+def build_mgp_db(sentence_model: CustomSentenceEmbedding, ltp_model: LTP, \
+                 mgp_data_path: str, mgp_db_folder_path: str):
+    
+    build_df_path = os.path.join(f'mgp-build_df.csv')
+    build_df = pd.read_csv(build_df_path) if os.path.exists(build_df_path) else pd.DataFrame(columns = ['Title'])
 
+    mgp_df = pd.read_csv(mgp_data_path)
+
+    database_path = os.path.join(mgp_db_folder_path, 'base.pkl')
+    title_db_path = os.path.join(mgp_db_folder_path, 'title')
+
+    if os.path.exists(mgp_db_folder_path) and os.path.exists(database_path):
+        mgp_database = MGPBase.load_db(sentence_model, database_path, title_db_path)
+    else:
+        os.makedirs(mgp_db_folder_path, exist_ok = True)
+        mgp_database = MGPBase(sentence_model, database_path, title_db_path)
+
+    cc = opencc.OpenCC('s2t')
+    length_limit = lambda text: (len(text) > 5)
+    url_remover = lambda text: re.sub(r'http[0-9a-zA-Z.:/＊]+', '', text)
+    remove_emoji = lambda text: emoji.replace_emoji(text, replace = '')
+    
+    for i in tqdm(mgp_df.index):
+        title = cc.convert(mgp_df.loc[i, 'Title'])
+        content = cc.convert(mgp_df.loc[i, 'Content'])
+        date = mgp_df.loc[i, 'Date']
+        url = mgp_df.loc[i, 'Url']
+
+        sentences = text_split(content)
+        sentences = [ remove_emoji(url_remover(text))[:100] for text in sentences if length_limit(url_remover(text)) and len(remove_emoji(url_remover(text))) > 0]
+        sentences = [title] + sentences
+
+        if len(sentences) == 0: continue
+
+        mgp_database.add_title(title, date, url)
+
+        _, srl_lst = get_noun_and_triple(ltp_model, sentences)
+        for j, stn in enumerate(sentences):
+            trps = srl_lst[j]
+
+            text_node = TextNode( stn, title, trps)
+            mgp_database.insert_textnode(text_node)
+            mgp_database.add_text_to_title( stn, title, date, url)
+    MGPBase.save_db(mgp_database)
+    return
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -193,6 +236,13 @@ if __name__ == '__main__':
 
     word_model = CustomWordEmbedding(WORD2VEC_MODEL_PATH, device)
     sentence_model = CustomSentenceEmbedding(TEXT2VEC_MODEL_PATH, device)
+
+    mgp_data_path = os.path.join(DATA_FOLDER, 'fake', 'all_mgp_fake.csv')
+    mgp_database = MGPBase.load_db(sentence_model, os.path.join(MGP_DATABASE_FOLDER, 'base.pkl'), os.path.join(MGP_DATABASE_FOLDER, 'title'))
+
+    for v in mgp_database.title_text_dict['烏克蘭推娃娃兵上戰場']:
+        print(v.text, v.trps)
+    # build_mgp_db(sentence_model, ltp_model, mgp_data_path, MGP_DATABASE_FOLDER)
 
     # year_month = os.path.join(DATABASE_FOLDER, '2025-01')
     # database = NewsBase.load_db(word_model, sentence_model, os.path.join(year_month, 'base.pkl'), os.path.join(year_month, 'entity'), os.path.join(year_month, 'title'))

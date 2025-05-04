@@ -186,8 +186,8 @@ if __name__ == '__main__':
     word_model = CustomWordEmbedding(WORD2VEC_MODEL_PATH, device)
     sentence_model = CustomSentenceEmbedding(TEXT2VEC_MODEL_PATH, device)
 
-    nli_tokenizer = BertTokenizer.from_pretrained('IDEA-CCNL/Erlangshen-MegatronBert-1.3B-NLI', cache_dir = NLI_MODEL_PATH)
-    nli_model = AutoModelForSequenceClassification.from_pretrained('IDEA-CCNL/Erlangshen-MegatronBert-1.3B-NLI', cache_dir = NLI_MODEL_PATH)
+    nli_tokenizer = BertTokenizer.from_pretrained('IDEA-CCNL/Erlangshen-MegatronBert-1.3B-NLI')
+    nli_model = AutoModelForSequenceClassification.from_pretrained('IDEA-CCNL/Erlangshen-MegatronBert-1.3B-NLI')
     nli_model.to(device)
 
     year_month = datetime.date(2025, 1, 1)
@@ -227,9 +227,6 @@ if __name__ == '__main__':
         result_df.loc[idx, 'Non-Contrad'] = len(non_contradictory_trps)
         result_df.loc[idx, 'Unfound'] = len(unfound_trps)
         idx += 1
-
-        if i % 20 == 0:
-            result_df.to_csv('Contradictory_Test_Result.csv', index = False)
     
     result_df.to_csv('Contradictory_Test_Result.csv', index = False)
 

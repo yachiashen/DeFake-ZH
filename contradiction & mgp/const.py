@@ -5,6 +5,7 @@ MODEL_FOLDER = os.path.join(PROJECT_FOLDER, 'model')
 
 DATA_FOLDER = os.path.join(PROJECT_FOLDER, 'data')
 DATABASE_FOLDER = os.path.join(PROJECT_FOLDER, 'db')
+MGP_DATABASE_FOLDER = os.path.join(DATABASE_FOLDER, 'mgp')
 
 ## Model Path
 LTP_MODEL_PATH = os.path.join(MODEL_FOLDER, 'ltp')
