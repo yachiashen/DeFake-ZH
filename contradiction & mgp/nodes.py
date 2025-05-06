@@ -5,6 +5,7 @@ import numpy as np
 import datetime
 
 from text2vec import Word2Vec
+from FlagEmbedding import BGEM3FlagModel
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 from langchain_core.embeddings import Embeddings
@@ -45,7 +46,7 @@ class CustomWordEmbedding(Embeddings):
         text_embeddings = self.embed_documents([word_a, word_b])
         return cosine_similarity([text_embeddings[0]], [text_embeddings[1]])
     
-## 針對句子的嵌入模型，使用 SentenceTransformer("shibing624/text2vec-base-chinese")。
+## 針對句子的嵌入模型，使用 SentenceTransformer("shibing624/text2vec-base-chinese")。 
 class CustomSentenceEmbedding(Embeddings):
     """ Custom Embedding Model with Openai API """
     
@@ -70,6 +71,35 @@ class CustomSentenceEmbedding(Embeddings):
         """Embed query text."""
         ## SentenceTransformer("shibing624/text2vec-base-chinese")
         text_embedding = self.word_model.encode([word], normalize_embeddings = True, device = self.device)
+        text_embedding = text_embedding.tolist()[0]
+        return text_embedding
+    
+    def compare_two_texts(self, word_a: str, word_b: str):
+        
+        text_embeddings = self.embed_documents([word_a, word_b])
+        return cosine_similarity([text_embeddings[0]], [text_embeddings[1]])
+
+## 針對整個內容的嵌入模型，使用 BGE-M3
+class CustomContentEmbedding(Embeddings):
+    """ Custom Embedding Model with Openai API """
+    
+    def __init__(self, text_embedding_path: str = None, device: torch.device = torch.device('cpu')):
+        
+        self.word_model = BGEM3FlagModel(model_name_or_path = text_embedding_path, use_fp16 = False, device = device)
+        self.device = device
+        self.embedding_dim = len(self.embed_query('test'))
+
+    def embed_documents(self, words: list[str]) -> list[list[float]]:
+        """Embed search docs."""
+        ## SentenceTransformer("shibing624/text2vec-base-chinese")
+        text_embeddings = self.word_model.encode(words, return_dense = True).get('dense_vecs')
+        text_embeddings = text_embeddings.tolist()
+        return text_embeddings
+
+    def embed_query(self, word: str) -> list[float]:
+        """Embed query text."""
+        ## SentenceTransformer("shibing624/text2vec-base-chinese")
+        text_embedding = self.word_model.encode([word], return_dense = True).get('dense_vecs')
         text_embedding = text_embedding.tolist()[0]
         return text_embedding
     
@@ -236,7 +266,8 @@ class NewsBase:
         obj.title_db = temp_title_db
         return
 
-class MGPBase:
+## 舊版 MGP 資料庫：利用 SentenceTransformer("shibing624/text2vec-base-chinese") 做句子嵌入以及三元組相似度匹配。
+class OldMGPBase:
     sentence_model: CustomSentenceEmbedding
 
     pkl_path:       str
@@ -301,7 +332,7 @@ class MGPBase:
         return base_obj
     
     @staticmethod
-    def save_db(obj:'MGPBase'):
+    def save_db(obj:'OldMGPBase'):
         obj.title_db.save_local(obj.title_db_path)
         
         temp_sentence_model = obj.sentence_model
@@ -311,6 +342,68 @@ class MGPBase:
             pickle.dump(obj, f)
         obj.sentence_model = temp_sentence_model
         obj.title_db = temp_title_db
+        return
+
+## 新版 MGP 資料庫：改用 BGE-M3 嵌入模型，對 MGP 資料（標題與內容）做嵌入。
+class MGPBase:
+
+    content_model: CustomContentEmbedding
+
+    pkl_path:      str
+    text_db_path:  str
+    
+    texts:         set[str]             # text: title|content
+    title_ids:     set[str]
+    text_db:       FAISS
+
+    def __init__(self, content_model: BGEM3FlagModel, pkl_path: str, text_db_path: str):
+        self.content_model = content_model
+
+        self.pkl_path = pkl_path
+        self.text_db_path = text_db_path
+
+        self.text_dict = dict()
+        self.texts = set()
+        self.title_ids = set()
+
+        self.text_db = FAISS( index = faiss.IndexFlatIP(content_model.embedding_dim), 
+                               embedding_function = content_model, 
+                               docstore = InMemoryDocstore(), 
+                               index_to_docstore_id = {})
+
+    def add_text(self, title:str, text: str, date: str, url: str):
+        if text in self.texts or title in self.title_ids: return
+        self.texts.add(text)
+        self.title_ids.add(title)
+
+        text_doc = Document(page_content = f'{text}', metadata = {'Title': title, 'Date': date, 'Url': url})
+        self.text_db.add_documents(documents = [text_doc], ids = [f'{title}'])
+        return 
+
+    @staticmethod
+    def load_db(content_model, pkl_path, text_db_path):
+        
+        with open(pkl_path, 'rb') as f:
+            base_obj = pickle.load(f)
+        base_obj.content_model = content_model
+
+        base_obj.pkl_path = pkl_path
+        base_obj.text_db_path = text_db_path
+
+        base_obj.text_db = FAISS.load_local(text_db_path, content_model, allow_dangerous_deserialization = True)
+        return base_obj
+    
+    @staticmethod
+    def save_db(obj:'MGPBase'):
+        obj.text_db.save_local(obj.text_db_path)
+        
+        temp_content_model = obj.content_model
+        temp_text_db = obj.text_db
+        obj.text_db = obj.content_model = None
+        with open(obj.pkl_path, 'wb') as f:
+            pickle.dump(obj, f)
+        obj.content_model = temp_content_model
+        obj.text_db = temp_text_db
         return
 
 if __name__ == '__main__':

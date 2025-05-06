@@ -111,14 +111,14 @@ def get_noun_and_triple(ltp_model, sentences):
     return nouns_lst, srl_lst
 
 ## 將新聞放入特定資料庫
-def insert_true_news(news_database: NewsBase, ltp_model: LTP, title: str, content: str):
+def insert_true_news(news_database: NewsBase, ltp_model: LTP, title: str, content: str, date: str, url: str):
 
     if not isinstance(title, str) or len(title) < 3:  return
     elif not isinstance(content, str):                return
 
     sentences = text_split(content)
     
-    news_database.add_title(title)
+    news_database.add_title(title, date, url)
 
     for batch_stn in batch_split(sentences):
         nouns_lst, srl_lst = get_noun_and_triple(ltp_model, batch_stn)
@@ -164,12 +164,12 @@ def build_all_json_news(word_model: CustomWordEmbedding, sentence_model: CustomS
     for news in tqdm(news_lst):
         title = re.sub(r'\s+',' ', news['Title']).strip()
         content = news['Content']
+        date = news['Date']
+        url = news['Url']
 
-        if title in news_database.titles:   
-            print(title)
-            continue
+        if title in news_database.titles: continue
 
-        insert_true_news(news_database, ltp_model, title, content)
+        insert_true_news(news_database, ltp_model, title, content, date, url)
         build_df.loc[i, 'Title'] = title
 
         i += 1
@@ -182,8 +182,8 @@ def build_all_json_news(word_model: CustomWordEmbedding, sentence_model: CustomS
     NewsBase.save_db(news_database)
     return 
 
-## 建立 MGP 資料庫
-def build_mgp_db(sentence_model: CustomSentenceEmbedding, ltp_model: LTP, \
+## 建立 MGP 資料庫（舊版）
+def build_old_mgp_db(sentence_model: CustomSentenceEmbedding, ltp_model: LTP, \
                  mgp_data_path: str, mgp_db_folder_path: str):
     
     build_df_path = os.path.join(f'mgp-build_df.csv')
@@ -195,10 +195,10 @@ def build_mgp_db(sentence_model: CustomSentenceEmbedding, ltp_model: LTP, \
     title_db_path = os.path.join(mgp_db_folder_path, 'title')
 
     if os.path.exists(mgp_db_folder_path) and os.path.exists(database_path):
-        mgp_database = MGPBase.load_db(sentence_model, database_path, title_db_path)
+        mgp_database = OldMGPBase.load_db(sentence_model, database_path, title_db_path)
     else:
         os.makedirs(mgp_db_folder_path, exist_ok = True)
-        mgp_database = MGPBase(sentence_model, database_path, title_db_path)
+        mgp_database = OldMGPBase(sentence_model, database_path, title_db_path)
 
     cc = opencc.OpenCC('s2t')
     length_limit = lambda text: (len(text) > 5)
@@ -226,8 +226,36 @@ def build_mgp_db(sentence_model: CustomSentenceEmbedding, ltp_model: LTP, \
             text_node = TextNode( stn, title, trps)
             mgp_database.insert_textnode(text_node)
             mgp_database.add_text_to_title( stn, title, date, url)
-    MGPBase.save_db(mgp_database)
+    OldMGPBase.save_db(mgp_database)
     return
+
+def build_mgp_db(content_model: CustomContentEmbedding, ltp_model: LTP, \
+                 mgp_data_path: str, mgp_db_folder_path: str):
+    mgp_df = pd.read_csv(mgp_data_path)
+
+    database_path = os.path.join(mgp_db_folder_path, 'base.pkl')
+    title_db_path = os.path.join(mgp_db_folder_path, 'title')
+
+    if os.path.exists(mgp_db_folder_path) and os.path.exists(database_path):
+        mgp_database = MGPBase.load_db(content_model, database_path, title_db_path)
+    else:
+        os.makedirs(mgp_db_folder_path, exist_ok = True)
+        mgp_database = MGPBase(content_model, database_path, title_db_path)
+
+    cc = opencc.OpenCC('t2s')
+    import time
+    for i in tqdm(mgp_df.index):
+        title = cc.convert(mgp_df.loc[i, 'Title'])
+        content = cc.convert(mgp_df.loc[i, 'Content'])
+        date = mgp_df.loc[i, 'Date']
+        url = mgp_df.loc[i, 'Url']
+
+        mgp_database.add_text(title, f'{title}|{content}', date, url)
+
+        if i % 20 == 0:
+            time.sleep(3)
+    MGPBase.save_db(mgp_database)
+    return 
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -235,14 +263,12 @@ if __name__ == '__main__':
     ltp_model.to(device)
 
     word_model = CustomWordEmbedding(WORD2VEC_MODEL_PATH, device)
-    sentence_model = CustomSentenceEmbedding(TEXT2VEC_MODEL_PATH, device)
+    content_model = CustomContentEmbedding(BGE_M3_MODEL_PATH, device)
 
     mgp_data_path = os.path.join(DATA_FOLDER, 'fake', 'all_mgp_fake.csv')
-    mgp_database = MGPBase.load_db(sentence_model, os.path.join(MGP_DATABASE_FOLDER, 'base.pkl'), os.path.join(MGP_DATABASE_FOLDER, 'title'))
+    # mgp_database = MGPBase.load_db(content_model, os.path.join(MGP_DATABASE_FOLDER, 'base.pkl'), os.path.join(MGP_DATABASE_FOLDER, 'title'))
 
-    for v in mgp_database.title_text_dict['烏克蘭推娃娃兵上戰場']:
-        print(v.text, v.trps)
-    # build_mgp_db(sentence_model, ltp_model, mgp_data_path, MGP_DATABASE_FOLDER)
-
+    # build_mgp_db(content_model, ltp_model, mgp_data_path, MGP_DATABASE_FOLDER)
+    
     # year_month = os.path.join(DATABASE_FOLDER, '2025-01')
-    # database = NewsBase.load_db(word_model, sentence_model, os.path.join(year_month, 'base.pkl'), os.path.join(year_month, 'entity'), os.path.join(year_month, 'title'))
+    # database = NewsBase.load_db(word_model, content_model, os.path.join(year_month, 'base.pkl'), os.path.join(year_month, 'entity'), os.path.join(year_month, 'title'))

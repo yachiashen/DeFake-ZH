@@ -127,6 +127,9 @@ def nli_compare_triples(target_A0, ref_A0_lst, target_trp, reference_trps, word_
 
 def check_contradiction(database, word_model, sentence_model, ltp_model, \
                         nli_tokenizer, nli_model, title, content):
+    A0_sim_buffer.clear()
+    obj_exist_buffer.clear()
+    trps_nli_buffer.clear()
 
     sentences = text_split(content)
     nouns_lst, judged_trp_lst = get_noun_and_triple(ltp_model, sentences)
@@ -178,23 +181,9 @@ def check_contradiction(database, word_model, sentence_model, ltp_model, \
     # (3) unfound_trps                 (the subj entity is not found in the reference trps)
     return contradictory_trps_pair, non_contradictory_trps, unfound_trps
 
-if __name__ == '__main__':
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    ltp_model = LTP(LTP_MODEL_PATH)
-    ltp_model.to(device)
-
-    word_model = CustomWordEmbedding(WORD2VEC_MODEL_PATH, device)
-    sentence_model = CustomSentenceEmbedding(TEXT2VEC_MODEL_PATH, device)
-
-    nli_tokenizer = BertTokenizer.from_pretrained('IDEA-CCNL/Erlangshen-MegatronBert-1.3B-NLI')
-    nli_model = AutoModelForSequenceClassification.from_pretrained('IDEA-CCNL/Erlangshen-MegatronBert-1.3B-NLI')
-    nli_model.to(device)
-
-    year_month = datetime.date(2025, 1, 1)
-    trg_database_path = os.path.join(DATABASE_FOLDER, f'{year_month.year:04d}-{year_month.month:02d}')
-    database = NewsBase.load_db(word_model, sentence_model, \
-                                os.path.join(trg_database_path, 'base.pkl'), os.path.join(trg_database_path, 'entity'), os.path.join(trg_database_path, 'title'))
-
+def __llm_reverse_news_test(database: NewsBase, word_model: CustomWordEmbedding, sentence_model: CustomSentenceEmbedding, \
+                            ltp_model: LTP, nli_tokenizer, nli_model):
+    
     llm_test_df = pd.read_csv(os.path.join(DATA_FOLDER, 'fake', 'llm_reverse_ref_news.csv'))
 
     result_df = pd.DataFrame(columns = "Title,Truth,Pred,Contrad,Non-Contrad,Unfound".split(','))
@@ -230,3 +219,36 @@ if __name__ == '__main__':
     
     result_df.to_csv('Contradictory_Test_Result.csv', index = False)
 
+if __name__ == '__main__':
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    ltp_model = LTP(LTP_MODEL_PATH)
+    ltp_model.to(device)
+
+    word_model = CustomWordEmbedding(WORD2VEC_MODEL_PATH, device)
+    sentence_model = CustomSentenceEmbedding(TEXT2VEC_MODEL_PATH, device)
+
+    nli_tokenizer = BertTokenizer.from_pretrained('IDEA-CCNL/Erlangshen-MegatronBert-1.3B-NLI')
+    nli_model = AutoModelForSequenceClassification.from_pretrained('IDEA-CCNL/Erlangshen-MegatronBert-1.3B-NLI')
+    nli_model.to(device)
+
+    year_month = datetime.date(2025, 1, 1)
+    trg_database_path = os.path.join(DATABASE_FOLDER, f'{year_month.year:04d}-{year_month.month:02d}')
+    database = NewsBase.load_db(word_model, sentence_model, \
+                                os.path.join(trg_database_path, 'base.pkl'), os.path.join(trg_database_path, 'entity'), os.path.join(trg_database_path, 'title'))
+    
+    # __llm_reverse_news_test(database, word_model, sentence_model, ltp_model, nli_tokenizer, nli_model)
+
+    import time
+    t1 = time.time()
+    title = "洛杉磯野火危機中誤發撤離警報 當局致歉"
+    content = """美國加州洛杉磯正經歷前所未見的野火災情，緊急管理部門今天針對誤發撤離警報表示感謝，因為這些警報導致這座原已緊張不安的城市陷入恐慌。法新社報導，洛杉磯數以百萬計支手機昨天下午和今天早上響起警報，自動發送的訊息呼籲民眾準備逃命。昨天廣泛發送的訊息提到：「這是來自洛杉磯郡消防局的緊急訊息。您所在的區域已發布撤離警告。」距離危險區域很遠的地區也收到這則訊息。「請保持警戒、留意任何威脅，並隨時準備撤離。請帶著親人、寵物及必需品。」洛杉磯太平洋斷崖（Pacific Palisades）及艾塔迪那（Altadena）地區的大火吞噬約1萬4164公頃土地，摧毀數以千計建築物，已造成11人死亡。對許多洛杉磯市民而言，警報系統是他們得知大火及撤離消息的首要來源。目前這個地區已約有15萬3000人被強制撤離。警報發布20分鐘後，相關單位發出更正，說明這則警報僅適用於洛杉磯北部新爆發的肯尼斯大火（Kenneth Fire）。然而，今天清晨4時左右，系統再次發出類似的錯誤訊息。洛杉磯郡緊急管理辦公室主任麥高恩（Kevin McGowan）表示，自動化錯誤引發民眾「挫折、憤怒與恐懼」。他對媒體說：「我無以表達我的感激。」麥高恩表示，他正與專家合作查明問題根源，以及為何有這麼多民眾收到與他們無關的警報訊息。他說：「我懇求各位不要停用手機上的（警報）訊息功能…這次事件令人極度挫折、痛苦和恐懼，但這些警報工具在緊急情況下拯救了許多生命。」保羅史密斯學院（Paul Smith's College）災害管理助理教授謝奇（Chris Sheach）表示，自動警報系統經常受「瑕疵和錯誤」影響，特別是因為它們很少大規模使用，但在災難期間減少死亡人數方面仍至關重要。他告訴法新社，「這次可能是因為編碼錯誤」，導致警報發送到錯誤地區代碼的不相關受眾」。"""
+    contradictory_trps_pair, non_contradictory_trps, unfound_trps = check_contradiction(database, word_model, sentence_model, ltp_model, nli_tokenizer, nli_model, title, content)
+
+    for trp_pair in contradictory_trps_pair:
+        trg_trp, ref_trp = trp_pair[0], trp_pair[1]
+
+        print(''.join([item[1] for item in trg_trp]), '|', ''.join([item[1] for item in ref_trp]))
+
+    t2 = time.time()
+    print(t2 - t1)
+    df.to_csv('trp_compare.csv', index = False)
