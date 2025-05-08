@@ -19,7 +19,6 @@ except:
     from .nodes import *
     from .build_db import get_noun_and_triple
 
-df = pd.DataFrame(columns = 'Target_Text,Ref_Text,Prob0,Prob1,Prob2,Label'.split(','))
 cc = opencc.OpenCC('t2s')
 A0_sim_buffer = dict()      # key: (target_A0, ref_A0), value: A0_sim_score
 obj_exist_buffer = dict()   # key: trp_text, value: true or false
@@ -109,13 +108,6 @@ def nli_compare_triples(target_A0, ref_A0_lst, target_trp, reference_trps, word_
             trps_nli_buffer[(target_trp_text, ref_trp_text)] = (probs, label)
         else:
             probs, label = trps_nli_buffer[(target_trp_text, ref_trp_text)]
-        
-        idx = len(df)
-        df.loc[idx, 'Target_Text'] = target_trp_text
-        df.loc[idx, 'Ref_Text'] = ref_trp_text
-        for i in range(3):
-            df.loc[idx, f'Prob{i}'] = probs[i]
-        df.loc[idx, 'Label'] = label
 
         # if nli model judge the triples are contradictory, test whether the two have the A1 item.
         if (probs[0] >= 0.5 and label == 0) and \
@@ -251,4 +243,3 @@ if __name__ == '__main__':
 
     t2 = time.time()
     print(t2 - t1)
-    df.to_csv('trp_compare.csv', index = False)

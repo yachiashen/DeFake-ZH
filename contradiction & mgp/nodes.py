@@ -27,22 +27,25 @@ class CustomWordEmbedding(Embeddings):
         self.device = device
         self.embedding_dim = len(self.embed_query('test'))
 
+    def _normalize(self, vecs: np.ndarray) -> np.ndarray:
+        norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+        return vecs / (norms + 1e-10)  # 防止除以 0
+
     def embed_documents(self, words: list[str]) -> list[list[float]]:
         """Embed search docs."""
         ## Word2Vec("w2v-light-tencent-chinese")
-        text_embeddings = self.word_model.encode(words, normalize_embeddings = True, device = self.device)
-        text_embeddings = text_embeddings.tolist()
-        return text_embeddings
+        text_embeddings = self.word_model.encode(words, device = self.device)
+        text_embeddings = self._normalize(text_embeddings)
+        return text_embeddings.tolist()
 
     def embed_query(self, word: str) -> list[float]:
         """Embed query text."""
         ## Word2Vec("w2v-light-tencent-chinese")
-        text_embedding = self.word_model.encode([word], normalize_embeddings = True, device = self.device)
-        text_embedding = text_embedding.tolist()[0]
-        return text_embedding
+        text_embedding = self.word_model.encode([word], device = self.device)
+        text_embedding = self._normalize(text_embedding)
+        return text_embedding[0].tolist()
     
     def compare_two_texts(self, word_a: str, word_b: str):
-        
         text_embeddings = self.embed_documents([word_a, word_b])
         return cosine_similarity([text_embeddings[0]], [text_embeddings[1]])
     
@@ -192,13 +195,13 @@ class NewsBase:
         self.word_model = word_model
         self.sentence_model = sentence_model
         self.pkl_path = pkl_path
-        self.entity_db = FAISS( index = faiss.IndexFlatL2(word_model.embedding_dim), 
+        self.entity_db = FAISS( index = faiss.IndexFlatIP(word_model.embedding_dim), 
                                embedding_function = word_model, 
                                docstore = InMemoryDocstore(), 
                                index_to_docstore_id = {})
         self.entity_dict = dict()
         self.titles = set()
-        self.title_db = FAISS( index = faiss.IndexFlatL2(sentence_model.embedding_dim), 
+        self.title_db = FAISS( index = faiss.IndexFlatIP(sentence_model.embedding_dim), 
                                embedding_function = sentence_model, 
                                docstore = InMemoryDocstore(), 
                                index_to_docstore_id = {})
@@ -207,8 +210,8 @@ class NewsBase:
 
     def search_entity(self, entity_name: str):    
         
-        search_result = self.entity_db.similarity_search_with_relevance_scores(query = entity_name, k = 1)
-
+        search_result = self.entity_db.similarity_search_with_score(query = entity_name, k = 1)
+        
         sim_entity_node = None
         if search_result: 
             sim_doc, score = search_result[0][0], search_result[0][1]

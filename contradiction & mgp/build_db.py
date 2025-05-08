@@ -137,7 +137,7 @@ def insert_true_news(news_database: NewsBase, ltp_model: LTP, title: str, conten
     return
 
 ## 建立該年該月的新聞資料庫
-def build_all_json_news(word_model: CustomWordEmbedding, sentence_model: CustomSentenceEmbedding, ltp_model:LTP, \
+def build_single_month_json_news(word_model: CustomWordEmbedding, sentence_model: CustomSentenceEmbedding, ltp_model:LTP, \
                     reference_news_folder_path: str, news_db_folder_path: str, year_month: datetime.date):
     
     news_path = os.path.join(reference_news_folder_path, f"{year_month.year:04d}-{year_month.month:02d}.json")
@@ -178,6 +178,53 @@ def build_all_json_news(word_model: CustomWordEmbedding, sentence_model: CustomS
             build_df.to_csv(build_df_path, index = False)
             NewsBase.save_db(news_database)
     
+    build_df.to_csv(build_df_path, index = False)
+    NewsBase.save_db(news_database)
+    return 
+
+## 將所有指定月的新聞放入同一資料庫
+def build_all_json_news(word_model: CustomWordEmbedding, sentence_model: CustomSentenceEmbedding, ltp_model:LTP, \
+                    reference_news_folder_path: str, news_db_folder_path: str, year_month_lst: list[datetime.date]):
+    
+    target_news_path = os.path.join(news_db_folder_path, 'all')
+    database_path = os.path.join(target_news_path, 'base.pkl')
+    entity_db_path = os.path.join(target_news_path, 'entity')
+    title_db_path = os.path.join(target_news_path, 'title')
+
+    if os.path.exists(target_news_path) and os.path.exists(database_path):
+        news_database = NewsBase.load_db(word_model, sentence_model, database_path, entity_db_path, title_db_path)
+    else:
+        os.makedirs(target_news_path, exist_ok = True)
+        news_database = NewsBase(word_model, sentence_model, database_path, entity_db_path, title_db_path)
+
+    build_df_path = os.path.join(f'news-build_df_all.csv')
+    build_df = pd.read_csv(build_df_path) if os.path.exists(build_df_path) else pd.DataFrame(columns = ['Title'])
+
+    i = 0
+    for year_month in year_month_lst:
+        news_path = os.path.join(reference_news_folder_path, f"{year_month.year:04d}-{year_month.month:02d}.json")
+
+        if not os.path.exists(news_path): raise FileNotFoundError
+
+        news_lst = list(load_json_file(news_path)['news'].values())
+        for news in tqdm(news_lst):
+            title = re.sub(r'\s+',' ', news['Title']).strip()
+            content = news['Content']
+            date = news['Date']
+            url = news['Url']
+
+            if title in news_database.titles: continue
+
+            insert_true_news(news_database, ltp_model, title, content, date, url)
+            build_df.loc[i, 'Title'] = title
+
+            i += 1
+            if i % 200 == 0:
+                build_df.to_csv(build_df_path, index = False)
+                NewsBase.save_db(news_database)
+        build_df.to_csv(build_df_path, index = False)
+        NewsBase.save_db(news_database)
+        
     build_df.to_csv(build_df_path, index = False)
     NewsBase.save_db(news_database)
     return 
@@ -229,6 +276,11 @@ def build_old_mgp_db(sentence_model: CustomSentenceEmbedding, ltp_model: LTP, \
     OldMGPBase.save_db(mgp_database)
     return
 
+def remove_mgp_item(mgp_database: MGPBase, ids: list[str]):
+    existing_ids = [doc_id for doc_id in ids if doc_id in mgp_database.text_db.docstore._dict]
+    if existing_ids:
+        mgp_database.text_db.delete(ids = existing_ids)
+
 def build_mgp_db(content_model: CustomContentEmbedding, ltp_model: LTP, \
                  mgp_data_path: str, mgp_db_folder_path: str):
     mgp_df = pd.read_csv(mgp_data_path)
@@ -263,12 +315,12 @@ if __name__ == '__main__':
     ltp_model.to(device)
 
     word_model = CustomWordEmbedding(WORD2VEC_MODEL_PATH, device)
-    content_model = CustomContentEmbedding(BGE_M3_MODEL_PATH, device)
+    sentence_model = CustomSentenceEmbedding(TEXT2VEC_MODEL_PATH, device)
+    # content_model = CustomContentEmbedding(BGE_M3_MODEL_PATH, device)
 
-    mgp_data_path = os.path.join(DATA_FOLDER, 'fake', 'all_mgp_fake.csv')
+    # mgp_data_path = os.path.join(DATA_FOLDER, 'fake', 'all_mgp_fake.csv')
+    # build_mgp_db(content_model, ltp_model, mgp_data_path, MGP_DATABASE_FOLDER)
     # mgp_database = MGPBase.load_db(content_model, os.path.join(MGP_DATABASE_FOLDER, 'base.pkl'), os.path.join(MGP_DATABASE_FOLDER, 'title'))
 
-    # build_mgp_db(content_model, ltp_model, mgp_data_path, MGP_DATABASE_FOLDER)
-    
-    # year_month = os.path.join(DATABASE_FOLDER, '2025-01')
-    # database = NewsBase.load_db(word_model, content_model, os.path.join(year_month, 'base.pkl'), os.path.join(year_month, 'entity'), os.path.join(year_month, 'title'))
+    for year_month in [datetime.date(2025, 1, 1), datetime.date(2025, 2, 1), datetime.date(2025, 3, 1)]:
+        build_single_month_json_news(word_model, sentence_model, ltp_model, REFERENCE_NEWS_PATH, DATABASE_FOLDER, year_month)

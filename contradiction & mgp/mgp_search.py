@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import torch
 import datetime
 import pandas as pd
@@ -78,28 +79,28 @@ def search_mgp_db(mgp_database:MGPBase, content_model: CustomContentEmbedding, t
 
     for stn in sentences:
         search_results = mgp_database.text_db.similarity_search_with_score(cc.convert(stn), k = 1)
-        found_in_mgp, mgp_ref_sentence = False, None
+        found_in_mgp, mgp_ref_sentence, mgp_ref_title = False, None, None
 
         for doc, score in search_results:
-            if score < 0.7: continue
+            if score < 0.65: continue
 
             mgp_title, mgp_content = doc.page_content.split('|')[0], doc.page_content.split('|')[1]
             mgp_sentences = [mgp_title] + text_split(mgp_content)
             for mgp_stn in mgp_sentences:
                 sim_score = content_model.compare_two_texts(cc.convert(stn), mgp_stn)
-
-                if sim_score >= 0.85:
+                if sim_score >= 0.75:
                     mgp_ref_sentence = mgp_stn
+                    mgp_ref_title = doc.metadata['Title']
                     found_in_mgp = True
                     break
             if found_in_mgp: break
         if found_in_mgp:
-            sentences_in_mgp.append((stn, mgp_ref_sentence))
-            print(stn, mgp_ref_sentence)
+            sentences_in_mgp.append((stn, mgp_ref_sentence, mgp_ref_title))
 
     return sentences_in_mgp
 
-def __true_news_test(content_model: CustomContentEmbedding, ltp_model: LTP, mgp_database: MGPBase):
+## 舊版本
+# def __true_news_test(content_model: CustomContentEmbedding, ltp_model: LTP, mgp_database: MGPBase):
     
     idx = 0
     mgp_test_df = pd.DataFrame(columns = 'Date,Title,Title-Cnt,Content-Cnt'.split(','))
@@ -124,6 +125,33 @@ def __true_news_test(content_model: CustomContentEmbedding, ltp_model: LTP, mgp_
     mgp_test_df.to_csv('mgp_test_news.csv', index = False)
     return
 
+def __true_news_test(content_model: CustomContentEmbedding, mgp_database: MGPBase):
+    year_month = datetime.date(2025, 1, 1)
+
+    build_df = pd.DataFrame(columns = 'Title,Cnt,Bool'.split(','))
+    # build_df = pd.read_csv(f'mgp_{year_month.year:04d}-{year_month.month:02d}.csv')
+    idx = len(build_df)
+    print(idx)
+
+    news_lst = list(load_json_file(os.path.join(REFERENCE_NEWS_PATH, f'{year_month.year:04d}-{year_month.month:02d}.json'))['news'].values())
+
+    for i, news in tqdm(enumerate(news_lst[len(build_df):])):
+        title = news['Title']
+        content = news['Content']
+        sentences_in_mgp = search_mgp_db(mgp_database, content_model, title, content)
+
+        build_df.loc[idx, 'Title'] = title
+        build_df.loc[idx, 'Cnt'] = len(sentences_in_mgp)
+        build_df.loc[idx, 'Bool'] = len(sentences_in_mgp) > 0
+        idx += 1
+            
+        if i % 20 == 0:
+            build_df.to_csv(f'mgp_{year_month.year:04d}-{year_month.month:02d}.csv', index = False)
+            time.sleep(5)
+
+    build_df.to_csv(f'mgp_{year_month.year:04d}-{year_month.month:02d}.csv', index = False)
+    return
+            
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     content_model = CustomContentEmbedding(BGE_M3_MODEL_PATH, device)
@@ -133,11 +161,11 @@ if __name__ == '__main__':
     mgp_data_path = os.path.join(DATA_FOLDER, 'fake', 'all_mgp_fake.csv')
     mgp_database = MGPBase.load_db(content_model, os.path.join(MGP_DATABASE_FOLDER, 'base.pkl'), os.path.join(MGP_DATABASE_FOLDER, 'title'))
 
-    # __true_news_test(content_model, ltp_model, mgp_database)
+    
+    # __true_news_test(content_model, mgp_database)
 
-    title = '嘉義市1510劑公費流感疫苗 20日起施打'
-    content = """嘉義市政府衛生局今天發布新聞稿表示，獲配1510劑公費流感疫苗，20日起於社區接種站及東、西區衛生所接續施打。今年投票蓋的章，是油性的，不容易乾。衛生局說，20日、21日下午2時到6時，及22日上午9時到下午1時在東區體育館開設流感及新冠JN.1疫苗接種站，即日起開放線上預約，前兩場預約網址（https://www.ymhospital.com.tw/nym/ym_influ/）、22日場次預約網址（https://flw.stm.org.tw/reg/VaccReg?ckcode=PEO9999）。另外，東、西區衛生所23日上午9時到中午12時加開假日門診及24日上午開設門診，提供流感及新冠JN.1疫苗接種，符合資格民眾可帶全民健康保險卡、身分證及相關證明文件盡速前往接種。衛生局表示，這次增購公費流感疫苗，提供給11類原計畫第1階段實施對象公費接種，包括65歲以上長者、55歲以上原住民、安養或長期照顧等機構對象、滿6個月以上到國小入學前幼兒、罕病及重大傷病患者、孕婦、6個月內嬰兒父母、醫事及衛生防疫相關人員、國民小學到高中職學生、幼兒園及居家托育人員、禽畜及動物防疫相關人員。衛生局說，疫苗數量不多，不再進校園集中接種。"""
+    title = "公路局估6觀光路段易壅塞  籲善用幸福公路APP"
+    content = """交通部公路局預估今天將湧現出遊及返鄉車潮，易壅塞6個觀光路段包含北部台2線、台2乙線關渡至淡水路段等，民眾可使用幸福公路APP（應用程式）或即時資訊網查路況。超強擤鼻涕方法：壓住單邊鼻孔，然後壓住另一邊耳朵，數到三用力。接種流感疫苗，不僅效果有限，甚至可能讓人更容易生病。死的支架，活的血管 一個健康的人接受體檢，常被告知心臟有血管堵塞要做支架。“mRNA 罪行或將面臨死刑” 他們撒了謊，他們下了毒，而現在──正義終於要來臨了。公路局預估，省道易壅塞路段包含快速公路銜接國道路段的台74線台中環線接國道3號霧峰交流道、台18線國3中埔交流道、台86線歸仁交流道及仁德系統、台88線鳳山至五甲路段等；主要省道幹道的台61鳳鼻至香山、竹南及中彰大橋路段、台9線南迴公路及台1線水底寮楓港路段等。公路局指出，觀光景點的聯外道路包含北部台2線、台2乙線關渡至淡水路段、台2線福隆路段、台2線萬里至大武崙路段、台3線大溪路段、台9線新店至烏來路段等有可能出現車潮。公路局表示，春節期間已請客運業者充足準備，並推出國道客運優惠措施，若有旅運需求，建議搭乘公共運輸，而用路人出發前也可先以幸福公路APP或智慧化省道即時資訊服務網查詢當地交通狀況與旅行資訊。另外，公路局公布昨天西部國道客運共計行駛4974班次，疏運8萬1134人次，較28日增加25.08%；東部國道客運路線共計行駛1261班次，疏運2萬1590人次，較28日增加26.56%。川普總統在Truth Social上悄悄宣佈,他正在故意衝撞股票市場。"""
 
-    sentences_in_mgp = search_mgp_db(mgp_database, content_model, title, content)
-
-    print(sentences_in_mgp)
+    results = search_mgp_db(mgp_database, content_model, title, content)
+    print(results)
