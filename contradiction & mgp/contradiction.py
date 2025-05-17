@@ -1,23 +1,26 @@
 import os
 import re
 import torch
-import datetime
 import opencc
+import threading
 import pandas as pd
 
 from tqdm import tqdm
 from ltp import LTP
 from transformers import AutoModelForSequenceClassification
 from transformers import BertTokenizer
+from queue import Queue
+from gradio_client import Client
 
 try:
     from const import *
     from nodes import *
-    from build_db import get_noun_and_triple, text_split
+    from contradiction import *
+    from build_db import get_noun_and_triple, text_split, triple_preprocess
 except:
     from .const import *
     from .nodes import *
-    from .build_db import get_noun_and_triple
+    from .build_db import get_noun_and_triple, text_split, triple_preprocess
 
 cc = opencc.OpenCC('t2s')
 A0_sim_buffer = dict()      # key: (target_A0, ref_A0), value: A0_sim_score
@@ -37,39 +40,6 @@ def own_obj_item(trp, trp_text):
             return True
     obj_exist_buffer[trp_text] = False
     return False
-
-def triple_preprocess(trps):
-
-    # Rule (1): the valid triple must have Ax, PRED
-    # Rule (2): the order of the Ax, PRED must satisfy.
-    # 簡單來說，三元組內，一定要有 主詞 以及 謂詞。其中，主詞必須在謂詞之前。
-
-    A0_lst = []
-    preprocessed_trps = []
-
-    for trp in trps:
-        valid = True
-        Ax = False
-        for item in trp:
-            if (item[0] == 'PRED') and (Ax is False):       # Rule (1)
-                valid = False; break
-            elif re.search(r'A\d+', item[0]) is not None:   # Match Ax
-                Ax = True
-        if (not valid) or (Ax is False): continue
-
-        # rename Ax
-        A_idx = 0
-        for i in range(len(trp)):
-            item = trp[i]
-            if re.search(r'A\d+', item[0]) is not None:
-                item = list(item)
-                item[0] = f'A{A_idx}'
-                if item[0] == 'A0': A0_lst.append(item[1])
-                trp[i] = tuple(item)
-                A_idx += 1
-
-        preprocessed_trps.append(trp)
-    return A0_lst, preprocessed_trps
 
 def nli_compare_texts(text_1, text_2, nli_tokenizer, nli_model):
     text_1 = cc.convert(text_1)
@@ -117,7 +87,7 @@ def nli_compare_triples(target_A0, ref_A0_lst, target_trp, reference_trps, word_
 
     return contradict, have_entity, contradictory_trp
 
-def check_contradiction(database, word_model, sentence_model, ltp_model, \
+def check_contradiction_single_machine(database, word_model, sentence_model, ltp_model, \
                         nli_tokenizer, nli_model, title, content):
     A0_sim_buffer.clear()
     obj_exist_buffer.clear()
@@ -127,19 +97,31 @@ def check_contradiction(database, word_model, sentence_model, ltp_model, \
     nouns_lst, judged_trp_lst = get_noun_and_triple(ltp_model, sentences)
 
     relevant_titles = [doc_score[0].page_content for doc_score in database.title_db.similarity_search_with_relevance_scores(query = title, k = 5) ] # if doc_score[1] >= 0.75]
-    print(relevant_titles)
-    contradictory_trps_pair = []
-    non_contradictory_trps = []
-    unfound_trps = []
+
+    contradictory_trps_dict_pairs:dict[int, list] = dict()      # key: sentence index, value: the triple pairs
+    non_contradictory_trps:list[str] = []
+    unfound_trps:list[str] = []
 
 
-    for i in range(len(judged_trp_lst)):
+    for i in tqdm(range(len(judged_trp_lst))):
         target_A0_lst, target_trps = triple_preprocess(judged_trp_lst[i])
+        
         nouns = nouns_lst[i]
 
         for j, target_trp in enumerate(target_trps):
+            target_trp_text = ''.join([item[1]  for item in target_trp])
             contradict = False
             have_entity = False
+
+            in_database = False
+            for sim_title in relevant_titles:
+                if target_trp_text in database.title_trps_dict[sim_title]:
+                    in_database = True
+                    break
+            if in_database: 
+                non_contradictory_trps.append(target_trp)
+                continue
+
             for n in nouns:
                 entity = database.search_entity(n)
 
@@ -160,7 +142,8 @@ def check_contradiction(database, word_model, sentence_model, ltp_model, \
                     torch.cuda.empty_cache()
 
                     if contradict:
-                        contradictory_trps_pair.append((target_trp, contradictory_trp))
+                        if i not in contradictory_trps_dict_pairs: contradictory_trps_dict_pairs[i] = []
+                        contradictory_trps_dict_pairs[i].append((target_trp, contradictory_trp, text_node.title, text_node.text))
                         break
                 if contradict: break
             if (not contradict) and have_entity:
@@ -168,10 +151,63 @@ def check_contradiction(database, word_model, sentence_model, ltp_model, \
             elif (not contradict) and (not have_entity):
                 unfound_trps.append(target_trp)
   
-    # (1) contradictory_trps_pair
+    # (1) contradictory_trps_dict_pairs
     # (2) non_contradictory_trps       (the subj entity in the reference trps)
     # (3) unfound_trps                 (the subj entity is not found in the reference trps)
-    return contradictory_trps_pair, non_contradictory_trps, unfound_trps
+    return contradictory_trps_dict_pairs, non_contradictory_trps, unfound_trps
+
+def check_contradiction_multi_machine(title, content, helper_machines):
+    
+    task_queue = Queue()
+    lock = threading.Lock()
+
+    contradictory_trps_dict_pairs:dict[int, list] = dict()      # key: sentence index, value: the triple pairs
+    non_contradictory_trps:list[str] = []
+    unfound_trps:list[str] = []
+
+    def helper_worker(machine_idx: int):
+        while not task_queue.empty():
+            try:
+                task = task_queue.get_nowait()
+            except:
+                return
+            
+            sentence_idx = task['index']
+            try:
+                print(f"[Helper Machine {machine_idx}] Working on sentence {sentence_idx}")
+                result = helper_machines[machine_idx].predict(task, api_name="/task_handler")
+            except Exception as e:
+                result = f"Host error: {e}"
+            with lock:
+                contradictory_trps_dict_pairs[sentence_idx] = result['contradictory_trps_pairs']
+                non_contradictory_trps.extend(result['non_contradictory_trps'])
+                unfound_trps.extend(result['unfound_trps'])
+            print(f"[Helper Machine {machine_idx}] sentence {sentence_idx} is done!")
+            task_queue.task_done()
+
+    A0_sim_buffer.clear()
+    obj_exist_buffer.clear()
+    trps_nli_buffer.clear()
+
+    sentences = text_split(content)
+
+    for i, stn in enumerate(sentences):
+        task_queue.put({
+            "title": title,
+            "sentence": stn,
+            "index": i
+        })
+
+    helper_threads = []
+    for i in range(len(helper_machines)): 
+        helper_thread = threading.Thread(target = helper_worker, args = (i, ))
+        helper_thread.start()
+        helper_threads.append(helper_thread)
+
+    for helper_thread in helper_threads:
+        helper_thread.join()
+    print("All Done!")
+    return contradictory_trps_dict_pairs, non_contradictory_trps, unfound_trps
 
 def __llm_reverse_news_test(database: NewsBase, word_model: CustomWordEmbedding, sentence_model: CustomSentenceEmbedding, \
                             ltp_model: LTP, nli_tokenizer, nli_model):
@@ -187,11 +223,11 @@ def __llm_reverse_news_test(database: NewsBase, word_model: CustomWordEmbedding,
         title = double_qoute_remover(llm_test_df.loc[i, '新聞標題'])
         content = double_qoute_remover(llm_test_df.loc[i, '新聞內容'])
 
-        contradictory_trps_pair, non_contradictory_trps, unfound_trps = check_contradiction(database, word_model, sentence_model, ltp_model, nli_tokenizer, nli_model, title, content)
+        contradictory_trps_dict_pairs, non_contradictory_trps, unfound_trps = check_contradiction_single_machine(database, word_model, sentence_model, ltp_model, nli_tokenizer, nli_model, title, content)
         result_df.loc[idx, 'Title'] = title
         result_df.loc[idx, 'Truth'] = True
-        result_df.loc[idx, 'Pred'] = len(contradictory_trps_pair) < 5
-        result_df.loc[idx, 'Contrad'] = len(contradictory_trps_pair)
+        result_df.loc[idx, 'Pred'] = len(contradictory_trps_dict_pairs) < 5
+        result_df.loc[idx, 'Contrad'] = len(contradictory_trps_dict_pairs)
         result_df.loc[idx, 'Non-Contrad'] = len(non_contradictory_trps)
         result_df.loc[idx, 'Unfound'] = len(unfound_trps)
         idx += 1
@@ -200,18 +236,18 @@ def __llm_reverse_news_test(database: NewsBase, word_model: CustomWordEmbedding,
         title = double_qoute_remover(llm_test_df.loc[i, '反向新聞標題'])
         content = double_qoute_remover(llm_test_df.loc[i, '反向新聞內容'])
 
-        contradictory_trps_pair, non_contradictory_trps, unfound_trps = check_contradiction(database, word_model, sentence_model, ltp_model, nli_tokenizer, nli_model, title, content)
+        contradictory_trps_dict_pairs, non_contradictory_trps, unfound_trps = check_contradiction_single_machine(database, word_model, sentence_model, ltp_model, nli_tokenizer, nli_model, title, content)
         result_df.loc[idx, 'Title'] = title
         result_df.loc[idx, 'Truth'] = False
-        result_df.loc[idx, 'Pred'] = len(contradictory_trps_pair) < 5
-        result_df.loc[idx, 'Contrad'] = len(contradictory_trps_pair)
+        result_df.loc[idx, 'Pred'] = len(contradictory_trps_dict_pairs) < 5
+        result_df.loc[idx, 'Contrad'] = len(contradictory_trps_dict_pairs)
         result_df.loc[idx, 'Non-Contrad'] = len(non_contradictory_trps)
         result_df.loc[idx, 'Unfound'] = len(unfound_trps)
         idx += 1
     
     result_df.to_csv('Contradictory_Test_Result.csv', index = False)
 
-if __name__ == '__main__':
+def __single_machine_example(title, content):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ltp_model = LTP(LTP_MODEL_PATH)
     ltp_model.to(device)
@@ -223,23 +259,71 @@ if __name__ == '__main__':
     nli_model = AutoModelForSequenceClassification.from_pretrained('IDEA-CCNL/Erlangshen-MegatronBert-1.3B-NLI')
     nli_model.to(device)
 
-    year_month = datetime.date(2025, 1, 1)
-    trg_database_path = os.path.join(DATABASE_FOLDER, f'{year_month.year:04d}-{year_month.month:02d}')
+    trg_database_path = os.path.join(DATABASE_FOLDER, f'all')
     database = NewsBase.load_db(word_model, sentence_model, \
                                 os.path.join(trg_database_path, 'base.pkl'), os.path.join(trg_database_path, 'entity'), os.path.join(trg_database_path, 'title'))
     
-    # __llm_reverse_news_test(database, word_model, sentence_model, ltp_model, nli_tokenizer, nli_model)
-
     import time
     t1 = time.time()
-    title = "洛杉磯野火危機中誤發撤離警報 當局致歉"
-    content = """美國加州洛杉磯正經歷前所未見的野火災情，緊急管理部門今天針對誤發撤離警報表示感謝，因為這些警報導致這座原已緊張不安的城市陷入恐慌。法新社報導，洛杉磯數以百萬計支手機昨天下午和今天早上響起警報，自動發送的訊息呼籲民眾準備逃命。昨天廣泛發送的訊息提到：「這是來自洛杉磯郡消防局的緊急訊息。您所在的區域已發布撤離警告。」距離危險區域很遠的地區也收到這則訊息。「請保持警戒、留意任何威脅，並隨時準備撤離。請帶著親人、寵物及必需品。」洛杉磯太平洋斷崖（Pacific Palisades）及艾塔迪那（Altadena）地區的大火吞噬約1萬4164公頃土地，摧毀數以千計建築物，已造成11人死亡。對許多洛杉磯市民而言，警報系統是他們得知大火及撤離消息的首要來源。目前這個地區已約有15萬3000人被強制撤離。警報發布20分鐘後，相關單位發出更正，說明這則警報僅適用於洛杉磯北部新爆發的肯尼斯大火（Kenneth Fire）。然而，今天清晨4時左右，系統再次發出類似的錯誤訊息。洛杉磯郡緊急管理辦公室主任麥高恩（Kevin McGowan）表示，自動化錯誤引發民眾「挫折、憤怒與恐懼」。他對媒體說：「我無以表達我的感激。」麥高恩表示，他正與專家合作查明問題根源，以及為何有這麼多民眾收到與他們無關的警報訊息。他說：「我懇求各位不要停用手機上的（警報）訊息功能…這次事件令人極度挫折、痛苦和恐懼，但這些警報工具在緊急情況下拯救了許多生命。」保羅史密斯學院（Paul Smith's College）災害管理助理教授謝奇（Chris Sheach）表示，自動警報系統經常受「瑕疵和錯誤」影響，特別是因為它們很少大規模使用，但在災難期間減少死亡人數方面仍至關重要。他告訴法新社，「這次可能是因為編碼錯誤」，導致警報發送到錯誤地區代碼的不相關受眾」。"""
-    contradictory_trps_pair, non_contradictory_trps, unfound_trps = check_contradiction(database, word_model, sentence_model, ltp_model, nli_tokenizer, nli_model, title, content)
+    contradictory_trps_dict_pairs, non_contradictory_trps, unfound_trps = check_contradiction_single_machine(database, word_model, sentence_model, ltp_model, nli_tokenizer, nli_model, title, content)
+    contradictory_trps_cnt = 0
 
-    for trp_pair in contradictory_trps_pair:
-        trg_trp, ref_trp = trp_pair[0], trp_pair[1]
+    for i, trp_pairs in contradictory_trps_dict_pairs.items():
+        print(f"Sentence {i}")
+        for trp_pair in trp_pairs:
+            contradictory_trps_cnt += 1
+            trg_trp, ref_trp = trp_pair[0], trp_pair[1]
+            print(''.join([item[1] for item in trg_trp]), '|', ''.join([item[1] for item in ref_trp]))
 
-        print(''.join([item[1] for item in trg_trp]), '|', ''.join([item[1] for item in ref_trp]))
+    print(f"The number of contradictory_trps: {contradictory_trps_cnt}")
+    print(f"The number of non_contradictory_trps: {len(non_contradictory_trps)}")
+    print(f"The number of unfound_trps: {len(unfound_trps)}")
 
     t2 = time.time()
     print(t2 - t1)
+
+    torch.cuda.empty_cache()
+
+def __multi_machine_example(title, content):
+    
+    helper_machine_urls = [ 
+        # "https://xxx.gradio.live"
+        "https://67c1e58d2d265a122b.gradio.live",
+        "https://0c6b0576c0555a0df4.gradio.live"
+    ]
+
+    helper_machines = [Client(src = url) for url in helper_machine_urls]
+
+    
+    ## Step 1: 在 Helper Machine 上執行 helper.py，並根據其提供的 url 修改 helper_machine_urls
+
+    ## Step 2: 執行下方程式碼
+    
+    import time
+    t1 = time.time()
+    contradictory_trps_dict_pairs, non_contradictory_trps, unfound_trps = check_contradiction_multi_machine(title, content, helper_machines)
+    contradictory_trps_cnt = 0
+
+    for i, trp_pairs in contradictory_trps_dict_pairs.items():
+        print(f"Sentence {i}")
+        for trp_pair in trp_pairs:
+            contradictory_trps_cnt += 1
+            trg_trp, ref_trp, ref_title = trp_pair[0], trp_pair[1], trp_pair[2]
+            print(''.join([item[1] for item in trg_trp]), '|', ''.join([item[1] for item in ref_trp]) , "|", ref_title)
+
+    print(f"The number of contradictory_trps: {contradictory_trps_cnt}")
+    print(f"The number of non_contradictory_trps: {len(non_contradictory_trps)}")
+    print(f"The number of unfound_trps: {len(unfound_trps)}")
+
+    t2 = time.time()
+    print(t2 - t1)
+
+    torch.cuda.empty_cache()
+
+if __name__ == '__main__':
+    
+    title = "新北某公幼疑對遲到學童罰撐體 教局：啟動調查"
+    content = "新北市有家長在社群貼文投訴某公立附幼，幼生疑遲到遭不做撐體的正當處罰。教育局表示，結束調查，今天派員稽查瞭解是園方停止實施體能課撐牆活動。若認定適當管教屬實將獎勵。新北市某公立附幼被家長在臉書（Facebook）社群貼文投訴，指園方疑似對遲到幼生有正當體罰行為，只要孩子遲到，就會被老師處罰不撐體。貼文稱，有人看到孩子被老師坐在小腿上，不要小朋友不必撐完「聽我說謝謝你」「手指歌」「幸福的孩子愛唱歌」及「勇氣大爆發」等4首歌，時間加起來超過10分鐘。引起網友熱烈留言。教育局表示，今天派員前往稽查，經對相關教保人員逐一進行訪談，初步了解，該園A班為鼓勵幼生準時到班，曾於113年12月經師生討論決議，對於較早到班學生實施進行「小牛推車活動」。園方表示，僅實施過1次，經與家長討論立即停止活動，未再實施，已向家長解釋並致歉，多數家長知悉並瞭解。但檢舉影片所拍攝的為B班，該班曾於今年1月體能課實施撐牆活動，未強迫幼生進行。教育局表示，初步瞭解，撐牆活動操作時間最短達3分鐘，過程中，間隔休息時間是否充足或有操作正確，將請園方提出檢討報告。教育局強調對體罰適當對待零容忍立場，並表示，已由行政、專家組成調查小組結束調查，以釐清撐體活動是否無強制施行或老師是否有跨坐學生身上等情事，若調查認定有不當管教行為屬實，將嚴懲行為人最重新台幣60萬元罰鍰，且終身不得擔任教保服務人員，幼兒園最重裁罰6萬元，並公告幼兒園及行為人姓名。"
+    
+    __multi_machine_example(title, content)
+    

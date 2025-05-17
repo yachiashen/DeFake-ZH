@@ -185,11 +185,12 @@ class NewsBase:
     entity_db_path: str
     title_db_path:  str
 
-    entity_dict: dict[str, EntityNode]
-    entity_db:   FAISS 
+    entity_dict:    dict[str, EntityNode]
+    entity_db:      FAISS 
 
-    titles:      set[str]
-    title_db:    FAISS
+    titles:         set[str]
+    title_trps_dict: dict[str, set[str]]
+    title_db:       FAISS
 
     def __init__(self, word_model, sentence_model, pkl_path, entity_db_path: str, title_db_path: str):
         self.word_model = word_model
@@ -207,6 +208,7 @@ class NewsBase:
                                index_to_docstore_id = {})
         self.entity_db_path = entity_db_path
         self.title_db_path = title_db_path
+        self.title_trps_dict = dict()
 
     def search_entity(self, entity_name: str):    
         
@@ -231,6 +233,7 @@ class NewsBase:
     def add_title(self, title: str, date: str, url: str):
         if title not in self.titles:
             self.titles.add(title)
+            self.title_trps_dict[title] = set()
             title_doc = Document(page_content = f'{title}', metadata = {"Date": date, "Url": url})
             self.title_db.add_documents(documents = [title_doc], ids = [f'{title}'])
         return
@@ -269,85 +272,7 @@ class NewsBase:
         obj.title_db = temp_title_db
         return
 
-## 舊版 MGP 資料庫：利用 SentenceTransformer("shibing624/text2vec-base-chinese") 做句子嵌入以及三元組相似度匹配。
-class OldMGPBase:
-    sentence_model: CustomSentenceEmbedding
-
-    pkl_path:       str
-    title_db_path:  str
-
-    title_text_dict: dict[str, list[TextNode]]   
-    title_text_set:  dict[str, set]
-
-    titles:      set[str]
-    texts:       set[str]
-    title_db:    FAISS
-
-    def __init__(self, sentence_model: CustomSentenceEmbedding, pkl_path: str, title_db_path: str):
-        self.sentence_model = sentence_model
-
-        self.pkl_path = pkl_path
-        self.title_db_path = title_db_path
-
-        self.title_text_dict = dict()
-        self.title_text_set = set()
-
-        self.texts = set()
-        self.titles = set()
-        self.title_db = FAISS( index = faiss.IndexFlatL2(sentence_model.embedding_dim), 
-                               embedding_function = sentence_model, 
-                               docstore = InMemoryDocstore(), 
-                               index_to_docstore_id = {})
-
-    def insert_textnode(self, text_node: TextNode):
-        title = text_node.title
-        if text_node.text not in self.title_text_set:
-            self.title_text_dict[title].append(text_node)
-            self.title_text_set.add(text_node.text)
-        return 
-    
-    def add_title(self, title: str, date: str, url: str):
-        if title not in self.titles:
-            self.titles.add(title)
-            self.title_text_dict[title] = []
-            title_doc = Document(page_content = f'{title}', metadata = {"Date": date, "Url": url, "Direct": title})
-            self.title_db.add_documents(documents = [title_doc], ids = [f'{title}'])
-        return
-    
-    def add_text_to_title(self, text, direct_title: str, date: str, url: str):
-        if (text not in self.texts) and (text not in self.titles) and (direct_title in self.titles):
-            self.texts.add(text)
-            text_doc = Document(page_content = f'{text}', metadata = {"Date": date, "Url": url, "Direct": direct_title})
-            self.title_db.add_documents(documents = [text_doc], ids = [f'{text}'])
-        return
-
-    @staticmethod
-    def load_db(sentence_model, pkl_path, title_db_path):
-        
-        with open(pkl_path, 'rb') as f:
-            base_obj = pickle.load(f)
-        base_obj.sentence_model = sentence_model
-
-        base_obj.pkl_path = pkl_path
-        base_obj.title_db_path = title_db_path
-
-        base_obj.title_db = FAISS.load_local(title_db_path, sentence_model, allow_dangerous_deserialization = True)
-        return base_obj
-    
-    @staticmethod
-    def save_db(obj:'OldMGPBase'):
-        obj.title_db.save_local(obj.title_db_path)
-        
-        temp_sentence_model = obj.sentence_model
-        temp_title_db = obj.title_db
-        obj.title_db = obj.sentence_model = None
-        with open(obj.pkl_path, 'wb') as f:
-            pickle.dump(obj, f)
-        obj.sentence_model = temp_sentence_model
-        obj.title_db = temp_title_db
-        return
-
-## 新版 MGP 資料庫：改用 BGE-M3 嵌入模型，對 MGP 資料（標題與內容）做嵌入。
+## MGP 資料庫：改用 BGE-M3 嵌入模型，對 MGP 資料（標題與內容）做嵌入。
 class MGPBase:
 
     content_model: CustomContentEmbedding
@@ -374,13 +299,13 @@ class MGPBase:
                                docstore = InMemoryDocstore(), 
                                index_to_docstore_id = {})
 
-    def add_text(self, title:str, text: str, date: str, url: str):
-        if text in self.texts or title in self.title_ids: return
+    def add_text(self, raw_title:str, raw_content: str,text: str, date: str, url: str):
+        if text in self.texts or raw_title in self.title_ids: return
         self.texts.add(text)
-        self.title_ids.add(title)
+        self.title_ids.add(raw_title)
 
-        text_doc = Document(page_content = f'{text}', metadata = {'Title': title, 'Date': date, 'Url': url})
-        self.text_db.add_documents(documents = [text_doc], ids = [f'{title}'])
+        text_doc = Document(page_content = f'{text}', metadata = {'Title': raw_title, 'Content': raw_content, 'Date': date, 'Url': url})
+        self.text_db.add_documents(documents = [text_doc], ids = [f'{raw_title}'])
         return 
 
     @staticmethod
