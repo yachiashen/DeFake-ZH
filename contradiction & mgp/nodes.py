@@ -2,7 +2,6 @@ import faiss
 import torch
 import pickle
 import numpy as np
-import datetime
 
 from text2vec import Word2Vec
 from FlagEmbedding import BGEM3FlagModel

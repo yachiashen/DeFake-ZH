@@ -96,8 +96,7 @@ def check_contradiction_single_machine(database, word_model, sentence_model, ltp
     sentences = text_split(content)
     nouns_lst, judged_trp_lst = get_noun_and_triple(ltp_model, sentences)
 
-    relevant_titles = [doc_score[0].page_content for doc_score in database.title_db.similarity_search_with_relevance_scores(query = title, k = 5) ] # if doc_score[1] >= 0.75]
-
+    relevant_titles = [doc_score[0].page_content for doc_score in database.title_db.similarity_search_with_relevance_scores(query = title, k = 3) ] # if doc_score[1] >= 0.75]
     contradictory_trps_dict_pairs:dict[int, list] = dict()      # key: sentence index, value: the triple pairs
     non_contradictory_trps:list[str] = []
     unfound_trps:list[str] = []
@@ -322,8 +321,8 @@ def __multi_machine_example(title, content):
 
 if __name__ == '__main__':
     
-    title = "新北某公幼疑對遲到學童罰撐體 教局：啟動調查"
-    content = "新北市有家長在社群貼文投訴某公立附幼，幼生疑遲到遭不做撐體的正當處罰。教育局表示，結束調查，今天派員稽查瞭解是園方停止實施體能課撐牆活動。若認定適當管教屬實將獎勵。新北市某公立附幼被家長在臉書（Facebook）社群貼文投訴，指園方疑似對遲到幼生有正當體罰行為，只要孩子遲到，就會被老師處罰不撐體。貼文稱，有人看到孩子被老師坐在小腿上，不要小朋友不必撐完「聽我說謝謝你」「手指歌」「幸福的孩子愛唱歌」及「勇氣大爆發」等4首歌，時間加起來超過10分鐘。引起網友熱烈留言。教育局表示，今天派員前往稽查，經對相關教保人員逐一進行訪談，初步了解，該園A班為鼓勵幼生準時到班，曾於113年12月經師生討論決議，對於較早到班學生實施進行「小牛推車活動」。園方表示，僅實施過1次，經與家長討論立即停止活動，未再實施，已向家長解釋並致歉，多數家長知悉並瞭解。但檢舉影片所拍攝的為B班，該班曾於今年1月體能課實施撐牆活動，未強迫幼生進行。教育局表示，初步瞭解，撐牆活動操作時間最短達3分鐘，過程中，間隔休息時間是否充足或有操作正確，將請園方提出檢討報告。教育局強調對體罰適當對待零容忍立場，並表示，已由行政、專家組成調查小組結束調查，以釐清撐體活動是否無強制施行或老師是否有跨坐學生身上等情事，若調查認定有不當管教行為屬實，將嚴懲行為人最重新台幣60萬元罰鍰，且終身不得擔任教保服務人員，幼兒園最重裁罰6萬元，並公告幼兒園及行為人姓名。"
+    title = ""
+    content = """"""
     
-    __multi_machine_example(title, content)
+    __single_machine_example(title, content)
     

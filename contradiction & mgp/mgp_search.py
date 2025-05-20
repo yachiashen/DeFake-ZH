@@ -1,13 +1,7 @@
 import os
-import re
-import time
 import torch
-import datetime
-import pandas as pd
 import opencc
 
-from tqdm import tqdm
-from ltp import LTP
 try:
     from const import *
     from nodes import *

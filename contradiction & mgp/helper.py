@@ -1,6 +1,7 @@
 import gradio as gr
 import torch
 import argparse
+import time
 
 from enum import Enum, auto
 from ltp import LTP
@@ -14,7 +15,7 @@ from mgp_search import search_mgp_db_single_machine
 from build_db import triple_preprocess, get_noun_and_triple, insert_true_news
 
 
-class HelperMachineType():
+class HelperMachineType(Enum):
     contradictory = auto()
     mgp_search    = auto()
 
@@ -77,12 +78,14 @@ def contradictory_task_handler(data):
     sentence  = data['sentence']
     idx       = data['index']
 
-    if (title != last_handle_title) or (last_handle_title is None):
+    tmp_relevant_titles = [doc_score[0].page_content for doc_score in news_database.title_db.similarity_search_with_relevance_scores(query = title, k = 3) ] # if doc_score[1] >= 0.75]
+    if (title != last_handle_title) or (last_handle_title is None) or \
+        tmp_relevant_titles != relevant_titles:
         A0_sim_buffer.clear()
         obj_exist_buffer.clear()
         trps_nli_buffer.clear()
         last_handle_title = title
-        relevant_titles = [doc_score[0].page_content for doc_score in news_database.title_db.similarity_search_with_relevance_scores(query = title, k = 5) ] # if doc_score[1] >= 0.75]
+        relevant_titles = tmp_relevant_titles 
     
     nouns_lst, judged_trp_lst = get_noun_and_triple(ltp_model, [sentence])
 
@@ -143,6 +146,19 @@ def contradictory_task_handler(data):
         "unfound_trps": unfound_trps
     }
 
+def contradictory_database_update(data):
+    """
+    data = {
+        "title":   str,
+        "content": str,
+    }
+    """
+    global ltp_model, news_database
+    title = data['title']
+    content = data['content']
+    insert_true_news(news_database, ltp_model, title, content, "", "")
+    return {"return": "Done!"}
+
 ## 處理MGP搜尋任務函數
 def mgp_task_handler(data):
     """
@@ -159,6 +175,17 @@ def mgp_task_handler(data):
     results = search_mgp_db_single_machine(mgp_database, content_model, title, content)
     return {"return": results }
 
+def shutdown_handler(helper_machine_type):
+    global news_database, ltp_model, nli_tokenizer, nli_model
+
+    if helper_machine_type == HelperMachineType.contradictory:
+        del nli_tokenizer, nli_model
+        torch.cuda.empty_cache()
+        time.sleep(5)
+        NewsBase.save_db(news_database)
+        print("Save Newsbase!")
+
+
 # 執行此程式碼的均屬於 helper machine 
 # main machine 請執行 gui.py
 if __name__ == '__main__':
@@ -171,19 +198,28 @@ if __name__ == '__main__':
     else:                       raise ValueError("Invalid helper machine type")
     
     load_model_and_db(helper_machine_type)
-    if helper_machine_type == HelperMachineType.contradictory:
-        iface = gr.Interface(
-            fn = contradictory_task_handler,
-            inputs = "json",
-            outputs = "json",
-            api_name = "task_handler",
-        )
-    else:
-        iface = gr.Interface(
-            fn = mgp_task_handler,
-            inputs = "json",
-            outputs = "json",
-            api_name = "task_handler",
-        )
 
-    iface.launch(share = True)
+    with gr.Blocks() as api_interface:
+        if helper_machine_type == HelperMachineType.contradictory:
+            iface = gr.Interface(
+                fn = contradictory_task_handler,
+                inputs = "json",
+                outputs = "json",
+                api_name = "task_handler",
+            )
+            update_iface = gr.Interface(
+                fn = contradictory_database_update,
+                inputs = "json",
+                outputs = "json",
+                api_name = "update",
+            )
+        else:
+            iface = gr.Interface(
+                fn = mgp_task_handler,
+                inputs = "json",
+                outputs = "json",
+                api_name = "task_handler",
+            )
+
+    api_interface.launch(share = True)
+    shutdown_handler(helper_machine_type)

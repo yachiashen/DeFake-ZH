@@ -6,7 +6,7 @@ from gradio_client import Client
 from build_db import text_split
 from interface import *
 
-s2t = opencc.OpenCC('s2t')
+t2s = opencc.OpenCC('t2s')
 
 global_title = None
 global_content = None
@@ -119,10 +119,6 @@ ref_news_replace_block = "<!-- Reference News Block -->"
 mgp_html_code = """"""
 sentence_dict = dict()
 
-## Contradiction Part
-contradictory_html_code = """"""
-trps_dict = dict()
-
 def mgp_button_press(button_id):
     global mgp_html_code
     
@@ -132,20 +128,20 @@ def mgp_button_press(button_id):
     ref_sentence = sentence_dict[button_id]['ref_stn']
 
     ## update target news content
-    if s2t.convert(global_title.strip()) == s2t.convert(trg_sentence.strip()):
+    if t2s.convert(global_title.strip()) == t2s.convert(trg_sentence.strip()):
         mgp_html_code = re.sub(rf"{title_replace_block}[\S\s]*{title_replace_block}", f"{title_replace_block}<span class=\"mark_area\">{global_title}</span>{title_replace_block}", mgp_html_code)
     else:
         mgp_html_code = re.sub(rf"{title_replace_block}[\S\s]*{title_replace_block}", f"{title_replace_block}{global_title}{title_replace_block}", mgp_html_code)
-    trg_news_content = ''.join([ f"<span class=\"mark_area\">{stn}</span>"  if s2t.convert(stn.strip()) == s2t.convert(trg_sentence.strip()) else stn for stn in global_sentences ])
+    trg_news_content = ''.join([ f"<span class=\"mark_area\">{stn}</span>"  if t2s.convert(stn.strip()) == t2s.convert(trg_sentence.strip()) else stn for stn in global_sentences ])
     trg_news_content = f"<div style=\"font-weight: bold;\"> 第{button_id + 1}組相似 </div>" + trg_news_content
 
     mgp_html_code = re.sub(rf"{content_replace_block}[\S\s]*{content_replace_block}", f"{content_replace_block}{trg_news_content}{content_replace_block}", mgp_html_code)
 
     ## Update reference news block
     raw_title, raw_sentences = sentence_dict[button_id]['ref_title_content'].split('|')[0], text_split(sentence_dict[button_id]['ref_title_content'].split('|')[1])
-
-    title = f"<span class=\"mark_area\">{raw_title}</span>"  if s2t.convert(raw_title) == s2t.convert(ref_sentence) else raw_title
-    content = ''.join([ f"<span class=\"mark_area\">{stn}</span>"  if s2t.convert(stn) == s2t.convert(ref_sentence) else stn for stn in raw_sentences ])
+    
+    title = f"<span class=\"mark_area\">{raw_title}</span>"  if t2s.convert(raw_title) == ref_sentence else raw_title
+    content = ''.join([ f"<span class=\"mark_area\">{stn}</span>"  if t2s.convert(stn) == ref_sentence else stn for stn in raw_sentences ])
     replace_text = f"""
 {ref_news_replace_block}
 <div class = "title">{title}</div><br>
@@ -185,6 +181,10 @@ def update_mgp_part(title, content):
 </div>
 """
     return gr.update(value = contradictory_html_title_code), gr.update(value = mgp_html_code), description
+
+## Contradiction Part
+contradictory_html_code = """"""
+trps_dict = dict()
 
 def contradictory_button_press(button_id):
     global contradictory_html_code
@@ -271,6 +271,7 @@ def update_contradiction_part(title, content):
     description = f"矛盾三元組數量為 {trp_cnt}\n\n找到相關，但無矛盾的三元組數量為 {len(non_contradictory_trps)}\n\n無找到相關實體節點的三元組數量為 {len(unfound_trps)}\n"
     return gr.update(value = contradictory_html_title_code), gr.update(value = contradictory_html_code), description
 
+## 分析按鈕 
 def interface_fn(title, content):
     
     analysis_result_text = "## 分析結果\n"
@@ -288,6 +289,10 @@ def interface_fn(title, content):
     return mgp_html_title_update, mgp_html_output_update, \
            contrad_html_title_update, contrad_html_output_update, analysis_result_text
 
+## 更新資料庫按鈕 
+def update_fn(title, content):
+    update_news_database_interface(title, content)
+
 with gr.Blocks() as demo:
     gr.Markdown("## 請輸入新聞資料")
     
@@ -296,6 +301,7 @@ with gr.Blocks() as demo:
             title_input = gr.Textbox(label="新聞標題", lines=1, placeholder="請輸入新聞標題")
             content_input = gr.Textbox(label="新聞內文", lines=10, placeholder="請輸入新聞內容")
             submit_btn = gr.Button("分析")
+            # update_btn = gr.Button("更新資料庫")
 
         with gr.Column():
             output_md = gr.Markdown()
@@ -319,6 +325,8 @@ with gr.Blocks() as demo:
         mgp_html_title, mgp_html_output, \
         contradictory_html_title, contradictory_html_output, \
         output_md])
+    # update_btn.click(fn = update_fn, inputs = [title_input, content_input])
 
 if __name__ == '__main__':
   demo.launch()
+  save_news_db()
