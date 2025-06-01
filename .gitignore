@@ -35,5 +35,12 @@ conda/
 *.sqlite3
 *.db
 
-# other
+# others
 *.csv
+*.json
+*.zip
+*.gradio
+models/*
+logs/*
+*.npy
+*.pt
