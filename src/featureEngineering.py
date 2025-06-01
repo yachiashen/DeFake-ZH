@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 
-from const import *
+from .const import *
 
 from transformers import BertTokenizer, BertModel
 from FlagEmbedding import BGEM3FlagModel

@@ -2,7 +2,7 @@ import os
 import sys
 import pandas as pd
 
-from const import *
+from .const import *
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
