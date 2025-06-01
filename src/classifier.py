@@ -5,7 +5,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from .const import *
+try:
+    from .const import *
+except:
+    from const import *
 
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.metrics import classification_report

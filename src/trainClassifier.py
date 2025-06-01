@@ -1,6 +1,12 @@
-from .const import *
-from .featureEngineering import *
-from .classifier import *
+try:
+    from .const import *
+    from .featureEngineering import *
+    from .classifier import *
+except:
+    from const import *
+    from featureEngineering import *
+    from classifier import *
+    
 
 # 固定串接順序
 def load_and_concat_features(feature_dir: str, prefix: str):
