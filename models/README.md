@@ -27,11 +27,11 @@ models/
 
 ---
 
-### **macbert-chinese**
+### **chinese-macbert-large**
 
-- **模型頁面**：[hfl/chinese-macbert-base](https://huggingface.co/hfl/chinese-macbert-base)
-- **指定 Commit**：`a986e004d2a7f2a1c2f5a3edef4e20604a974ed1`  
-- **下載方式**：透過 `transformers` 套件自動下載，無需手動處理。
+- **模型頁面**：[hfl/chinese-macbert-large](https://huggingface.co/hfl/chinese-macbert-large)  
+- **指定 Commit**：`1cf2677c782975600ce58e2961656b1b29eddbae`
+- **下載方式**：透過 `transformers` 套件自動下載。
 
 ---
 
@@ -41,10 +41,22 @@ models/
 - **來源**：建議使用 [HIT-SCIR/LTP](https://github.com/HIT-SCIR/ltp) 預訓練模型。
 - **存放位置**：請將模型檔案置於 `ltp`。
 
+---
+
+### **task**
+
+---
+
+### **text2vec**
+
+---
+
+### **word2vec**
 
 ---
 
 ### 備註
 
 > 為避免 Hugging Face 或第三方模型未來版本變動導致模型不相容，**請務必使用指定 commit 或模型版本**。
+
 > 所有模型皆建議在本地下載後使用，避免每次執行重新抓取權重。
