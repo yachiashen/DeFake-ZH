@@ -1,4 +1,3 @@
-import re
 from sympy import false
 import gradio as gr
 
@@ -12,24 +11,27 @@ except:
     from interface import *
     from contradictionGUI import *
 
+
 lang_options = {
     "繁體中文": {
-        "title": "假新聞偵測器",
-        "description": "輸入一篇新聞標題與內文，系統將分析語氣與真假判斷",
+        "title": "## 中文假新聞偵測器",
+        "description": "輸入一篇新聞標題與內文，系統將判斷真假機率與分析語氣",
         "input_title": "新聞標題",
         "input_content": "新聞內文",
-        "submit_btn": "-- 提交 --",
+        "submit_btn": "-- 完整分析 --",
+        "quick_btn": "-- 快速分析 --",
         "clear_btn": "-- 清除 --",
         "accordion_label": "點我展開查看詳細分析",
         "result": "分析結果",
         "disclaimer": "<div align='center'><small>⚠️ 本系統僅供參考，分析結果來自機器學習模型，請勿視為最終真實依據。 ⚠️</small></div>"
     },
     "English": {
-        "title": "Fake News Detector for Chinese",
+        "title": "## Fake News Detector for Chinese",
         "description": "Enter the headline and content to analyze its truthfulness and tone.",
         "input_title": "News Title",
         "input_content": "News Content",
-        "submit_btn": "-- SUBMIT --",
+        "submit_btn": "-- FULL ANALYSIS --",
+        "quick_btn": "-- QUICK ANALYSIS --",
         "clear_btn": "-- CLEAR --",
         "accordion_label": "Click to show detailed analysis",
         "result": "Results",
@@ -37,17 +39,7 @@ lang_options = {
     }
 }
 
-# def update_labels(language):
-#     config = lang_options[language]
-#     return (
-#         gr.update(label=config["input_title"]),
-#         gr.update(label=config["input_content"]),
-#         gr.update(value="", label=config["result"]),
-#         config["title"],
-#         config["description"],
-#         gr.update(value=config["submit_btn"]),
-#         gr.update(value=config["clear_btn"])
-#     )
+
 def update_labels(language):
     config = lang_options[language]
     return (
@@ -55,38 +47,43 @@ def update_labels(language):
         gr.update(label=config["input_content"]),
         gr.update(label=config["result"]),
         gr.update(value=config["submit_btn"]),
+        gr.update(value=config["quick_btn"]),
         gr.update(value=config["clear_btn"]),
-        gr.update(value=config["title"]),          # Markdown
-        gr.update(value=config["description"]),    # Markdown
+        gr.Markdown(value=config["title"]),
+        gr.update(value=config["description"]),
         gr.update(label=config["accordion_label"]),
         gr.update(value=config["disclaimer"])
     )
 
+
 def title_score_transform(title_score_dict: dict[str, int]):
     """
-    負面詞彙：整體描述是否為相較負面的。（數值從 0 至 100）
-    命令或挑釁語氣：是否有命令讀者的舉動。（數值從 0 至 100）
-    絕對化語言：對於事件描述是否過於極端。（數值從 0 至 100）
+    負面詞彙：文本整體描述是否為相較負面。  （ 數值從 0 至 100 ）
+    
+    命令或挑釁語氣：是否有命令讀者的舉動。  （ 數值從 0 至 100 ）
+    
+    絕對化語言：對於事件描述是否過於極端。  （ 數值從 0 至 100 ）
     """
     ret_score_dict = dict()
 
     for feature, score in title_score_dict.items():
         score = int(score)
         if 0 <= score <= 20:
-            ret_score_dict[feature] = f"幾乎無相關特徵 ({score}%)"
+            ret_score_dict[feature] = f"（{score}％）： 幾乎無相關特徵"
         elif 21 <= score <= 50:
-            ret_score_dict[feature] = f"有部分特徵，但不明顯 ({score}%)"
+            ret_score_dict[feature] = f"（{score}％）： 有部分特徵，但不明顯"
         elif 51 <= score <= 70:
-            ret_score_dict[feature] = f"較為明顯，可能影響讀者判斷 ({score}%)"
+            ret_score_dict[feature] = f"（{score}％）： 較為明顯，可能影響讀者判斷"
         else:
-            ret_score_dict[feature] = f"特徵極為明顯 ({score}%)"
+            ret_score_dict[feature] = f"（{score}％）： 特徵極為明顯"
 
     return ret_score_dict
 
 def sentence_score_transform(sentence_score_dict: dict[str, int]):
     """
-    情感分析: 句子整體是正面、負面或者中立。（數值從 -100 至 100）
-    主觀性  : 句子是否具有主觀性。（數值從 0 至 100）
+    情感分析： 句子整體是正面、負面或者中立。 （ 數值從 -100 至 100 ）
+    
+    主觀性： 句子是否具有主觀性。           （ 數值從 0 至 100 ）
     """
     ret_score_dict = dict()
     
@@ -95,81 +92,153 @@ def sentence_score_transform(sentence_score_dict: dict[str, int]):
     emotion = int((sentence_score_dict['情感分析'] * (-1) + 100) / 2)
 
     if 0 <= emotion <= 20:
-        ret_score_dict['情感分析'] = f"非常正面 ({emotion}%)"
+        ret_score_dict['情感分析'] = f"（{emotion}％）： 非常正面"
     elif 21 <= emotion <= 40:
-        ret_score_dict['情感分析'] = f"偏正面 ({emotion}%)"
+        ret_score_dict['情感分析'] = f"（{emotion}％）： 偏正面"
     elif 41 <= emotion <= 60:
-        ret_score_dict['情感分析'] = f"中性 ({emotion}%)"
+        ret_score_dict['情感分析'] = f"（{emotion}％）： 中性"
     elif 61 <= emotion <= 80:
-        ret_score_dict['情感分析'] = f"偏負面 ({emotion}%)"
+        ret_score_dict['情感分析'] = f"（{emotion}％）： 偏負面"
     else:
-        ret_score_dict['情感分析'] = f"非常負面 ({emotion}%)"
+        ret_score_dict['情感分析'] = f"（{emotion}％）： 非常負面"
     
     ## 主觀性
     subjective = int(sentence_score_dict['主觀性'])
     if 0 <= subjective <= 20:
-        ret_score_dict['主觀性'] = f"幾乎客觀 ({subjective}%)"
+        ret_score_dict['主觀性'] = f"（{subjective}％）： 幾乎客觀"
     elif 21 <= subjective <= 40:
-        ret_score_dict['主觀性'] = f"稍微主觀 ({subjective}%)"
+        ret_score_dict['主觀性'] = f"（{subjective}％）： 稍微主觀"
     elif 41 <= subjective <= 60:
-        ret_score_dict['主觀性'] = f"中度主觀 ({subjective}%)"
+        ret_score_dict['主觀性'] = f"（{subjective}％）： 中度主觀"
     elif 61 <= subjective <= 80:
-        ret_score_dict['主觀性'] = f"偏主觀 ({subjective}%)"
+        ret_score_dict['主觀性'] = f"（{subjective}％）： 偏主觀"
     else:
-        ret_score_dict['主觀性'] = f"非常主觀 ({subjective}%)"
+        ret_score_dict['主觀性'] = f"（{subjective}％）： 非常主觀"
 
     return ret_score_dict
 
+
 def interface_fn(title, content):
-    yield "［1/3］正在分析標題與內文...", "", "", "", "", ""
+    print("\n\n======  開始完整分析  ======\n\n")
+    score = 0
+    
+    yield "［1/4］正在搜尋 MGP 資料庫...", "", "", "", "", ""
+    
+    ### MGP Part
+    mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_bool = update_mgp_part(title, content)
+    detail = f"\n<h3 style='color: orange;'>MGP 資料搜尋結果：</h3>\n\n"
+    detail += mgp_description + "\n\n"
+    
+    if bool(mgp_bool):
+        score += 33.333
+        print(f"\n[MGP] : score += 33.333, current score = {score}\n")
+    
+    yield "［2/4］ MGP 資料庫比對完成，正在檢查邏輯矛盾...", detail, mgp_html_title_update, mgp_html_output_update, "", ""
+    
+    ### Contradiction Part
+    contrad_html_title_update, contrad_html_output_update, contrad_description, contrad_bool = update_contradiction_part(title, content)
+    detail += f"\n<h3 style='color: orange;'>三元組搜尋矛盾結果：</h3>\n\n"
+    detail += contrad_description + "\n\n"
+    
+    if bool(contrad_bool):
+        score += 33.333
+        print(f"\n[CONTRAD] : score += 33.333, current score = {score}\n")
+
+    yield "［3/4］邏輯矛盾比對完成，正在分析標題與內文...", detail, mgp_html_title_update, mgp_html_output_update, contrad_html_title_update, contrad_html_output_update
 
     news_sentences, title_dict, sentences_dict, sentence_summary_scores, prob = get_all_scores(title, content)
-    # news_sentences, title_dict, sentences_dict, sentence_summary_scores, prob, is_fake = [], dict(), dict(), dict(), 0, False
+    print(f"\n[BERT] : prob = {prob * 100}\n")
 
-    score = prob * 100
+    score += prob * 100
+    score = min(score, 99.999)
     if score > 67:
         judgment = "高機率假新聞"
     elif score < 34:
         judgment = "高可信度真新聞"
     else:
         judgment = "可能為真也可能為假，建議進一步查證"
-    summary = f"經過系統判斷此新聞為【{judgment}】\n\n"
-    summary += f"預測為假新聞的機率：{score:.2f}%\n"
-    # summary = f"預測為假新聞的機率：{prob * 100:.2f}%  ->  {'假' if is_fake else '真'}新聞\n\n"
-    summary += "句子綜合分數：\n"
+    
+    summary = "========================================\n\n"
+    summary += f"      〔 預測為假新聞的機率 ： {score:.3f} ％ 〕   \n\n"
+    summary += f"經過系統判斷此新聞為 【 {judgment} 】 \n\n"
+    summary += "========================================\n\n"
+    summary += "      〔 句子綜合分數 〕   \n\n"
+    
     sentence_summary_score_dict = sentence_score_transform(sentence_summary_scores)
     for k, v in sentence_summary_score_dict.items():
-        summary += f"・ {k}：{v}\n"
-
+        summary += f"  ・ {k}{v}  \n\n"
+    summary += "========================================"
     
-    detail = "<h3 style='color: orange;'>標題分析：</h3>\n\n"
+    detail += "<h3 style='color: orange;'>標題分析：</h3>\n\n"
     title_score_dict = title_score_transform(title_dict)
     for k, v in title_score_dict.items():
-        detail += f"- {k}：{v}\n"
+        detail += f"- {k}{v}\n"
 
-    detail += "\n<h3 style='color: orange;'>內文句子分析：</h3>\n"
+    detail += "\n\n<h3 style='color: orange;'>內文句子分析：</h3>\n"
     for sent in news_sentences:
         detail += f"\n> {sent}\n"
         sentence_score_dict = sentence_score_transform(sentences_dict[sent])
         for term in ['情感分析', '主觀性']:
-            detail += f"- {term}：{sentence_score_dict[term]}\n"
+            detail += f"- {term}{sentence_score_dict[term]}\n"
 
-    yield summary, detail + "\n\n［2/3］語氣分析完成，正在搜尋資料庫...", "", "", "", ""
+    yield summary, detail, mgp_html_title_update, mgp_html_output_update, contrad_html_title_update, contrad_html_output_update
 
+
+def quick_interface_fn(title, content):
+    print("\n\n======  開始快速分析  ======\n\n")
+    score = 0
+    
+    yield "［1/3］正在搜尋 MGP 資料庫...", "", "", "", "", ""
+    
     ### MGP Part
-    mgp_html_title_update, mgp_html_output_update, mgp_description = update_mgp_part(title, content)
-    detail += f"\n<h3 style='color: orange;'>MGP 資料搜尋結果：</h3>\n\n"
+    mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_bool = update_mgp_part(title, content)
+    detail = f"\n<h3 style='color: orange;'>MGP 資料搜尋結果：</h3>\n\n"
     detail += mgp_description + "\n\n"
 
-    yield summary, detail + "\n\n［3/3］資料庫比對完成，正在檢查邏輯矛盾...", mgp_html_title_update, mgp_html_output_update, "", ""
-
-    ### Contradiction Part
-    contrad_html_title_update, contrad_html_output_update, contrad_description = update_contradiction_part(title, content)
-    detail += f"\n<h3 style='color: orange;'>三元組搜尋矛盾結果：</h3>\n\n"
-    detail += contrad_description
+    if bool(mgp_bool):
+        score += 33.333
+        print(f"\n[MGP] : score += 33.333, current score = {score}\n")
     
-    yield summary, detail, mgp_html_title_update, mgp_html_output_update, contrad_html_title_update, contrad_html_output_update
-    # return summary, detail
+    yield "［2/3］ MGP 資料庫比對完成，正在分析標題與內文...", detail, mgp_html_title_update, mgp_html_output_update, "", ""
+
+    news_sentences, title_dict, sentences_dict, sentence_summary_scores, prob = get_all_scores(title, content)
+    print(f"\n[BERT] : prob = {prob * 100}\n")
+    
+    score += prob * 100
+    score = min(score, 99.999)
+        
+    if score > 67:
+        judgment = "【 高機率假新聞 】 "
+    elif score < 33:
+        judgment = "【 高可信度真新聞 】 "
+    else:
+        judgment = "\n\t【 可能為真也可能為假，建議進一步查證 】"
+    
+    summary = "========================================\n\n"
+    summary += f"      〔 預測為假新聞的機率 ： {score:.3f} ％ 〕   \n\n"
+    summary += f"經過系統判斷此新聞為  {judgment}\n\n"
+    summary += "========================================\n\n"
+    summary += "      〔 句子綜合分數 〕   \n\n"
+    
+    sentence_summary_score_dict = sentence_score_transform(sentence_summary_scores)
+    for k, v in sentence_summary_score_dict.items():
+        summary += f"  ・ {k}{v}  \n\n"
+    summary += "========================================"
+    
+    detail += "<h3 style='color: orange;'>標題分析：</h3>\n\n"
+    title_score_dict = title_score_transform(title_dict)
+    for k, v in title_score_dict.items():
+        detail += f"- {k}{v}\n"
+
+    detail += "\n\n<h3 style='color: orange;'>內文句子分析：</h3>\n"
+    for sent in news_sentences:
+        detail += f"\n> {sent}\n"
+        sentence_score_dict = sentence_score_transform(sentences_dict[sent])
+        for term in ['情感分析', '主觀性']:
+            detail += f"- {term}{sentence_score_dict[term]}\n"
+
+    yield summary, detail, mgp_html_title_update, mgp_html_output_update, "", ""
+
 
 with gr.Blocks() as demo:
     # gr.Markdown("# DeFake-ZH")
@@ -179,9 +248,8 @@ with gr.Blocks() as demo:
         with gr.Column(scale=1, min_width=150):
             lang = gr.Dropdown(["繁體中文", "English"], label="", value="繁體中文")
         
-    # lang = gr.Dropdown(["繁體中文", "English"], label="Language 語言", value="繁體中文")
-    title_markdown = gr.Markdown("## 假新聞偵測器")
-    desc_markdown = gr.Markdown("輸入一篇新聞標題與內文，系統將分析語氣與真假判斷")
+    title_markdown = gr.Markdown("## 中文假新聞偵測器")
+    desc_markdown = gr.Markdown("輸入一篇新聞標題與內文，系統將判斷真假機率與分析語氣")
 
     with gr.Row():
         with gr.Column():
@@ -189,7 +257,8 @@ with gr.Blocks() as demo:
             content_input = gr.Textbox(label="新聞內文", lines=6)
             with gr.Row():
                 clear_btn = gr.Button(value="-- 清除 --")
-                submit_btn = gr.Button(value="-- 提交 --")
+                quick_btn = gr.Button(value="-- 快速分析 --")
+                submit_btn = gr.Button(value="-- 完整分析 --")
                 
 
         with gr.Column():
@@ -197,6 +266,7 @@ with gr.Blocks() as demo:
             output_summary = gr.Textbox(label="分析結果")
             with gr.Accordion(label="點我展開查看詳細分析", open=False) as accordion_box:
                 output_detail = gr.Markdown()
+    
     ## MGP Part
     mgp_html_title = gr.HTML()
     mgp_html_output = gr.HTML()
@@ -206,7 +276,8 @@ with gr.Blocks() as demo:
     contradictory_html_title = gr.HTML()
     contradictory_html_output = gr.HTML()
     set_contradiction_hidden_button(contradictory_html_output)
-        
+    
+    
     disclaimer_text = gr.Markdown(lang_options["繁體中文"]["disclaimer"])
     
     lang.change(
@@ -215,11 +286,18 @@ with gr.Blocks() as demo:
 
         outputs=[
             title_input, content_input, output_summary,
-            submit_btn, clear_btn,
+            submit_btn, quick_btn, clear_btn,
             title_markdown, desc_markdown,
             accordion_box,
             disclaimer_text
         ]
+    )
+
+    quick_btn.click(
+        fn=quick_interface_fn,
+        inputs=[title_input, content_input],
+        outputs=[output_summary, output_detail, mgp_html_title, mgp_html_output, 
+        contradictory_html_title, contradictory_html_output]
     )
     
     submit_btn.click(
@@ -234,17 +312,6 @@ with gr.Blocks() as demo:
         outputs=[title_input, content_input, output_summary, output_detail, 
                  mgp_html_title, mgp_html_output, contradictory_html_title, contradictory_html_output]
     )
-
-# demo = gr.Interface(
-#     fn=interface_fn,
-#     inputs=[
-#         gr.Textbox(label="新聞標題", lines=1, placeholder="請輸入新聞標題"),
-#         gr.Textbox(label="新聞內文", lines=10, placeholder="請輸入新聞內容")
-#     ],
-#     outputs=gr.Textbox(label="分析結果"),
-#     title="DeFake-ZH",
-#     description="輸入一篇新聞標題與內文，系統將分析語氣與真假判斷"
-# )
 
 
 if __name__ == "__main__":

@@ -194,7 +194,7 @@ def update_mgp_part(title, content):
       mgp_html_code = ""
 
     description = f"- 共有{len(sentences_pairs)}組句子相似" if len(sentences_pairs) > 0 else "- MPG 資料庫無搜尋到任何資料"
-    return gr.update(value = mgp_html_title_code), gr.update(value = mgp_html_code), description
+    return gr.update(value = mgp_html_title_code), gr.update(value = mgp_html_code), description, len(sentences_pairs)
 
 def set_mgp_hidden_button(mgp_html_output):
     
@@ -293,7 +293,7 @@ def update_contradiction_part(title, content):
       contradictory_html_code = ""
     
     description = f"- 矛盾三元組數量為 {trp_cnt}\n\n- 找到相關，但無矛盾的三元組數量為 {len(non_contradictory_trps)}\n\n- 無找到相關實體節點的三元組數量為 {len(unfound_trps)}\n"
-    return gr.update(value = contradictory_html_title_code), gr.update(value = contradictory_html_code), description
+    return gr.update(value = contradictory_html_title_code), gr.update(value = contradictory_html_code), description, trp_cnt
 
 def set_contradiction_hidden_button(contradictory_html_output):
     
