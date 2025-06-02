@@ -62,6 +62,64 @@ def update_labels(language):
         gr.update(value=config["disclaimer"])
     )
 
+def title_score_transform(title_score_dict: dict[str, int]):
+    """
+    負面詞彙：整體描述是否為相較負面的。（數值從 0 至 100）
+    命令或挑釁語氣：是否有命令讀者的舉動。（數值從 0 至 100）
+    絕對化語言：對於事件描述是否過於極端。（數值從 0 至 100）
+    """
+    ret_score_dict = dict()
+
+    for feature, score in title_score_dict.items():
+        score = int(score)
+        if 0 <= score <= 20:
+            ret_score_dict[feature] = f"幾乎無相關特徵 ({score}%)"
+        elif 21 <= score <= 50:
+            ret_score_dict[feature] = f"有部分特徵，但不明顯 ({score}%)"
+        elif 51 <= score <= 70:
+            ret_score_dict[feature] = f"較為明顯，可能影響讀者判斷 ({score}%)"
+        else:
+            ret_score_dict[feature] = f"特徵極為明顯 ({score}%)"
+
+    return ret_score_dict
+
+def sentence_score_transform(sentence_score_dict: dict[str, int]):
+    """
+    情感分析: 句子整體是正面、負面或者中立。（數值從 -100 至 100）
+    主觀性  : 句子是否具有主觀性。（數值從 0 至 100）
+    """
+    ret_score_dict = dict()
+    
+    ## 情感分析
+    # value range is converted to [0, 100] (極正面 ~ 極負面)
+    emotion = int((sentence_score_dict['情感分析'] * (-1) + 100) / 2)
+
+    if 0 <= emotion <= 20:
+        ret_score_dict['情感分析'] = f"非常正面 ({emotion}%)"
+    elif 21 <= emotion <= 40:
+        ret_score_dict['情感分析'] = f"偏正面 ({emotion}%)"
+    elif 41 <= emotion <= 60:
+        ret_score_dict['情感分析'] = f"中性 ({emotion}%)"
+    elif 61 <= emotion <= 80:
+        ret_score_dict['情感分析'] = f"偏負面 ({emotion}%)"
+    else:
+        ret_score_dict['情感分析'] = f"非常負面 ({emotion}%)"
+    
+    ## 主觀性
+    subjective = int(sentence_score_dict['主觀性'])
+    if 0 <= subjective <= 20:
+        ret_score_dict['主觀性'] = f"幾乎客觀 ({subjective}%)"
+    elif 21 <= subjective <= 40:
+        ret_score_dict['主觀性'] = f"稍微主觀 ({subjective}%)"
+    elif 41 <= subjective <= 60:
+        ret_score_dict['主觀性'] = f"中度主觀 ({subjective}%)"
+    elif 61 <= subjective <= 80:
+        ret_score_dict['主觀性'] = f"偏主觀 ({subjective}%)"
+    else:
+        ret_score_dict['主觀性'] = f"非常主觀 ({subjective}%)"
+
+    return ret_score_dict
+
 def interface_fn(title, content):
     yield "［1/3］正在分析標題與內文...", "", "", "", "", ""
 
@@ -79,19 +137,22 @@ def interface_fn(title, content):
     summary += f"預測為假新聞的機率：{score:.2f}%\n"
     # summary = f"預測為假新聞的機率：{prob * 100:.2f}%  ->  {'假' if is_fake else '真'}新聞\n\n"
     summary += "句子綜合分數：\n"
-    for k, v in sentence_summary_scores.items():
-        summary += f"・ {k}：{v:.2f}\n"
+    sentence_summary_score_dict = sentence_score_transform(sentence_summary_scores)
+    for k, v in sentence_summary_score_dict.items():
+        summary += f"・ {k}：{v}\n"
 
     
     detail = "<h3 style='color: orange;'>標題分析：</h3>\n\n"
-    for k, v in title_dict.items():
-        detail += f"- {k}：{v:.2f}\n"
+    title_score_dict = title_score_transform(title_dict)
+    for k, v in title_score_dict.items():
+        detail += f"- {k}：{v}\n"
 
     detail += "\n<h3 style='color: orange;'>內文句子分析：</h3>\n"
     for sent in news_sentences:
         detail += f"\n> {sent}\n"
+        sentence_score_dict = sentence_score_transform(sentences_dict[sent])
         for term in ['情感分析', '主觀性']:
-            detail += f"- {term}：{sentences_dict[sent][term]:.2f}\n"
+            detail += f"- {term}：{sentence_score_dict[term]}\n"
 
     yield summary, detail + "\n\n［2/3］語氣分析完成，正在搜尋資料庫...", "", "", "", ""
 
