@@ -93,7 +93,14 @@ def check_contradiction_single_machine(database, word_model, sentence_model, ltp
     trps_nli_buffer.clear()
 
     sentences = text_split(content)
+
+    if len(sentences) == 0:
+        return dict(), list(), list()
+
     nouns_lst, judged_trp_lst = get_noun_and_triple(ltp_model, sentences)
+
+    if not isinstance(title, str) or title == "":
+        title = sentences[0][:20]
 
     relevant_titles = [doc_score[0].page_content for doc_score in database.title_db.similarity_search_with_relevance_scores(query = title, k = 3) ] # if doc_score[1] >= 0.75]
     contradictory_trps_dict_pairs:dict[int, list] = dict()      # key: sentence index, value: the triple pairs
@@ -188,6 +195,9 @@ def check_contradiction_multi_machine(title, content, helper_machines):
     trps_nli_buffer.clear()
 
     sentences = text_split(content)
+
+    if len(sentences) > 0 and (not isinstance(title, str) or title == ""):
+        title = sentences[0][:20]
 
     for i, stn in enumerate(sentences):
         task_queue.put({

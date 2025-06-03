@@ -102,7 +102,11 @@ def text_split(text):
     if start != len(text):
         sentences.append(text[start: ].strip())
 
-    sentences = [re.sub(r'\s+', '', txt) for txt in sentences if len(re.sub(r'\s+', '', txt)) > 0]
+    chinese_punct = "，。！？：；「」『』‘’“”（）【】——…、《》、—～"
+    english_punct = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+    all_punct = chinese_punct + english_punct
+    all_pattern = "[" + re.escape(all_punct) + r"\s]+"
+    sentences = [re.sub(r'\s+', '', txt) for txt in sentences if len(re.sub(all_pattern, '', txt)) >= 3]
     return sentences
 
 def batch_split(sentences, batch_size: int = 16):
@@ -418,7 +422,7 @@ if __name__ == '__main__':
     
     ## 產生 MGP 資料庫
     # mgp_data_path = os.path.join(DATA_FOLDER, 'fake', 'all_mgp_fake.csv')
-    # build_mgp_db(content_model, ltp_model, mgp_data_path, MGP_DATABASE_FOLDER)
+    # build_mgp_db(content_model, mgp_data_path, MGP_DATABASE_FOLDER)
 
     ## 載入 MGP 資料庫
     # mgp_database = MGPBase.load_db(content_model, os.path.join(MGP_DATABASE_FOLDER, 'base.pkl'), os.path.join(MGP_DATABASE_FOLDER, 'title'))

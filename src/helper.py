@@ -224,4 +224,4 @@ if __name__ == '__main__':
             )
 
     api_interface.launch(share = True)
-    shutdown_handler(helper_machine_type)
+    # shutdown_handler(helper_machine_type)

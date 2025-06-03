@@ -34,6 +34,13 @@ def split_content(content: str):
         
     if start != len(content):
         sentences.append(content[start: ].strip())
+
+    chinese_punct = "，。！？：；「」『』‘’“”（）【】——…、《》、—～"
+    english_punct = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+    all_punct = chinese_punct + english_punct
+    all_pattern = "[" + re.escape(all_punct) + r"\s]+"
+    sentences = [re.sub(r'\s+', '', txt) for txt in sentences if len(re.sub(all_pattern, '', txt)) >= 3]
+    
     return sentences
 
 
@@ -88,6 +95,15 @@ def get_sentence_summary_scores(sentences, sentences_dict):
 def predict_title(title, model_path):
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"找不到模型檔案：{model_path}")
+    
+    if not isinstance(title, str) or title == "":
+        title_scores = [0.0, 0.0, 0.0]
+        title_dict = {
+            "負面詞彙":      0.0,
+            "命令或挑釁語氣":0.0,
+            "絕對化語言":    0.0,
+        }
+        return title_scores, title_dict
     
     title_embedding = torch.from_numpy(np.array(titles_embed_query([title]), dtype = np.float32)).to(DEVICE)
     

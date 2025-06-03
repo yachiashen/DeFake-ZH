@@ -1,4 +1,3 @@
-from sympy import false
 import gradio as gr
 
 
@@ -122,6 +121,10 @@ def interface_fn(title, content):
     print("\n\n======  開始完整分析  ======\n\n")
     score = 0
     
+    if not isinstance(content, str) or content == "":
+        yield "〔 請輸入新聞內容再進行分析 〕", "", "", "", "", ""
+        return 
+    
     yield "［1/4］正在搜尋 MGP 資料庫...", "", "", "", "", ""
     
     ### MGP Part
@@ -152,15 +155,15 @@ def interface_fn(title, content):
     score += prob * 100
     score = min(score, 99.999)
     if score > 67:
-        judgment = "高機率假新聞"
-    elif score < 34:
-        judgment = "高可信度真新聞"
+        judgment = "【 高機率假新聞 】 "
+    elif score < 15:
+        judgment = "【 高可信度真新聞 】 "
     else:
-        judgment = "可能為真也可能為假，建議進一步查證"
+        judgment = "\n\t【 可能為真也可能為假，建議進一步查證 】"
     
     summary = "========================================\n\n"
     summary += f"      〔 預測為假新聞的機率 ： {score:.3f} ％ 〕   \n\n"
-    summary += f"經過系統判斷此新聞為 【 {judgment} 】 \n\n"
+    summary += f"經過系統判斷此新聞為  {judgment}\n\n"
     summary += "========================================\n\n"
     summary += "      〔 句子綜合分數 〕   \n\n"
     
@@ -187,6 +190,10 @@ def interface_fn(title, content):
 def quick_interface_fn(title, content):
     print("\n\n======  開始快速分析  ======\n\n")
     score = 0
+
+    if not isinstance(content, str) or content == "":
+        yield "〔 請輸入新聞內容再進行分析 〕", "", "", "", "", ""
+        return 
     
     yield "［1/3］正在搜尋 MGP 資料庫...", "", "", "", "", ""
     
@@ -209,7 +216,7 @@ def quick_interface_fn(title, content):
         
     if score > 67:
         judgment = "【 高機率假新聞 】 "
-    elif score < 33:
+    elif score < 15:
         judgment = "【 高可信度真新聞 】 "
     else:
         judgment = "\n\t【 可能為真也可能為假，建議進一步查證 】"
@@ -315,4 +322,4 @@ with gr.Blocks() as demo:
 
 
 if __name__ == "__main__":
-    demo.launch(share=false)
+    demo.launch(share=False)
