@@ -121,6 +121,7 @@ def interface_fn(title, content):
     print("\n\n======  開始完整分析  ======\n\n")
     score = 0
     
+    title, content = re.sub(r'\s+', '', title), re.sub(r'\s+', '', content)
     if not isinstance(content, str) or content == "":
         yield "〔 請輸入新聞內容再進行分析 〕", "", "", "", "", ""
         return 
@@ -191,11 +192,13 @@ def quick_interface_fn(title, content):
     print("\n\n======  開始快速分析  ======\n\n")
     score = 0
 
+    title, content = re.sub(r'\s+', '', title), re.sub(r'\s+', '', content)
     if not isinstance(content, str) or content == "":
         yield "〔 請輸入新聞內容再進行分析 〕", "", "", "", "", ""
         return 
     
     yield "［1/3］正在搜尋 MGP 資料庫...", "", "", "", "", ""
+
     
     ### MGP Part
     mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_bool = update_mgp_part(title, content)
