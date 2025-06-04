@@ -102,7 +102,10 @@ def check_contradiction_single_machine(database, word_model, sentence_model, ltp
     if not isinstance(title, str) or title == "":
         title = sentences[0][:20]
 
-    relevant_titles = [doc_score[0].page_content for doc_score in database.title_db.similarity_search_with_relevance_scores(query = title, k = 3) ] # if doc_score[1] >= 0.75]
+    relevant_news = database.title_db.similarity_search_with_relevance_scores(query = title, k = 3)
+    relevant_titles = [doc_score[0].page_content for doc_score in relevant_news ] # if doc_score[1] >= 0.75]
+    title_url_dict = {doc_score[0].page_content: doc_score[0].metadata['Url'] for doc_score in relevant_news}
+    
     contradictory_trps_dict_pairs:dict[int, list] = dict()      # key: sentence index, value: the triple pairs
     non_contradictory_trps:list[str] = []
     unfound_trps:list[str] = []
@@ -148,7 +151,7 @@ def check_contradiction_single_machine(database, word_model, sentence_model, ltp
 
                     if contradict:
                         if i not in contradictory_trps_dict_pairs: contradictory_trps_dict_pairs[i] = []
-                        contradictory_trps_dict_pairs[i].append((target_trp, contradictory_trp, text_node.title, text_node.text))
+                        contradictory_trps_dict_pairs[i].append((target_trp, contradictory_trp, text_node.title, text_node.text, title_url_dict[text_node.title]))
                         break
                 if contradict: break
             if (not contradict) and have_entity:

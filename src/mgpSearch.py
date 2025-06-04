@@ -32,11 +32,12 @@ def search_mgp_db_single_machine(mgp_database:MGPBase, content_model: CustomCont
                     mgp_ref_sentence = mgp_stn
                     mgp_ref_title = doc.metadata['Title']
                     mgp_ref_content = doc.metadata['Content']
+                    mgp_ref_url = doc.metadata['Url']
                     found_in_mgp = True
                     break
             if found_in_mgp: break
         if found_in_mgp:
-            sentences_in_mgp.append((stn, mgp_ref_sentence, f"{mgp_ref_title}|{''.join([stn for stn in text_split(mgp_ref_content)])}"))
+            sentences_in_mgp.append((stn, mgp_ref_sentence, f"{mgp_ref_title}|{''.join([stn for stn in text_split(mgp_ref_content)])}", mgp_ref_url))
 
     return sentences_in_mgp
 

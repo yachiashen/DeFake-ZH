@@ -80,7 +80,11 @@ def contradictory_task_handler(data):
 
     print(f"Handle: title[{title}], sentence[{sentence}]")
 
-    tmp_relevant_titles = [doc_score[0].page_content for doc_score in news_database.title_db.similarity_search_with_relevance_scores(query = title, k = 3) ] # if doc_score[1] >= 0.75]
+    relevant_news = news_database.title_db.similarity_search_with_relevance_scores(query = title, k = 3)
+
+    tmp_relevant_titles = [doc_score[0].page_content for doc_score in relevant_news ] # if doc_score[1] >= 0.75]
+    tmp_title_url_dict = {doc_score[0].page_content: doc_score[0].metadata['Url'] for doc_score in relevant_news}
+
     if (title != last_handle_title) or (last_handle_title is None) or \
         tmp_relevant_titles != relevant_titles:
         A0_sim_buffer.clear()
@@ -132,7 +136,7 @@ def contradictory_task_handler(data):
                 torch.cuda.empty_cache()
 
                 if contradict:
-                    contradictory_trps_pairs.append((target_trp, contradictory_trp, text_node.title, text_node.text))
+                    contradictory_trps_pairs.append((target_trp, contradictory_trp, text_node.title, text_node.text, tmp_title_url_dict[text_node.title]))
                     break
             if contradict: break
         if (not contradict) and have_entity:

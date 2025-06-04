@@ -94,6 +94,10 @@ html_code_template = """
   background-color: white;
   color: black;
 }
+
+.ref-news-block {
+  color: black !important;
+}
 </style>
 
 <div style="display: flex; justify-content: center; gap: 10px;">
@@ -155,6 +159,7 @@ def mgp_button_press(button_id):
     replace_text = f"""
 {ref_news_replace_block}
 <div class = "title">{title}</div><br>
+<div class=\"ref-news-block\" left="0">網址：<a href=\"{sentence_dict[button_id]['url']}\" target="_blank">{sentence_dict[button_id]['url']}</a></div>
 <div class = "content">{content}</div>
 {ref_news_replace_block}
 """
@@ -176,6 +181,7 @@ def update_mgp_part(title, content):
       sentence_dict[i]['trg_stn'] = stn_pair[0]
       sentence_dict[i]['ref_stn'] = stn_pair[1]
       sentence_dict[i]['ref_title_content'] = stn_pair[2]
+      sentence_dict[i]['url'] = stn_pair[3]
 
       button_replace_text += f"<button onclick=\"document.getElementById('hidden_button_{i}_mgp').click();\">{i + 1}</button>\n"
 
@@ -220,13 +226,15 @@ def contradictory_button_press(button_id):
     
     contradictory_html_code = re.sub(rf"{content_replace_block}[\S\s]*{content_replace_block}", f"{content_replace_block}{trg_news_content}{content_replace_block}", contradictory_html_code)
     
+    news_source = lambda url: "中央社" if 'cna' in url else "公視"
     ## Update reference news block
     ref_sentence_with_trp_mark = mark_triple_in_sentence(trps_dict[button_id]['text'], trps_dict[button_id]['ref_trp'])
     
     replace_text = f"""
 {ref_news_replace_block}
 <div class = "title">{trps_dict[button_id]['title']}</div><br>
-<div class = "content">{ref_sentence_with_trp_mark}</div>
+<div class=\"ref-news-block\" left="0">參考新聞來源：{news_source(trps_dict[button_id]['url'])}｜網址：<a href=\"{trps_dict[button_id]['url']}\" target="_blank">{trps_dict[button_id]['url']}</a></div>
+<div class = "content">{ref_sentence_with_trp_mark}</div><br>
 {ref_news_replace_block}
 """
     contradictory_html_code = re.sub(rf"{ref_news_replace_block}[\S\s]*{ref_news_replace_block}", replace_text, contradictory_html_code)
@@ -273,6 +281,7 @@ def update_contradiction_part(title, content):
           trps_dict[trp_cnt]['title'] = trp_pair[2]
           trps_dict[trp_cnt]['text'] = trp_pair[3]
           trps_dict[trp_cnt]['stn_idx'] = i
+          trps_dict[trp_cnt]['url'] = trp_pair[4]
 
           button_replace_text += f"<button onclick=\"document.getElementById('hidden_button_{trp_cnt}').click();\">{trp_cnt + 1}</button>\n"
           trp_cnt += 1
