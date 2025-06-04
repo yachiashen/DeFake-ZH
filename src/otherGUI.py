@@ -143,7 +143,7 @@ def mgp_button_press(button_id):
     else:
         mgp_html_code = re.sub(rf"{title_replace_block}[\S\s]*{title_replace_block}", f"{title_replace_block}{global_title}{title_replace_block}", mgp_html_code)
     trg_news_content = ''.join([ f"<span class=\"mark_area\">{stn}</span>"  if t2s.convert(stn.strip()) == t2s.convert(trg_sentence.strip()) else stn for stn in global_sentences ])
-    trg_news_content = f"<div style=\"font-weight: bold;\"> 第{button_id + 1}組相似 </div>" + trg_news_content
+    trg_news_content = f"<div class=\"content\" style=\"font-weight: bold;\"> 第{button_id + 1}組相似 </div>" + trg_news_content
 
     mgp_html_code = re.sub(rf"{content_replace_block}[\S\s]*{content_replace_block}", f"{content_replace_block}{trg_news_content}{content_replace_block}", mgp_html_code)
 
@@ -216,7 +216,7 @@ def contradictory_button_press(button_id):
     trg_news_content = ''.join(global_sentences[:sentence_idx] + 
                                [mark_triple_in_sentence(global_sentences[sentence_idx], trps_dict[button_id]['trg_trp'])] + 
                                global_sentences[sentence_idx + 1:])
-    trg_news_content = f"<div style=\"font-weight: bold;\"> 第{button_id + 1}組矛盾 </div>" + trg_news_content
+    trg_news_content = f"<div class=\"content\" style=\"font-weight: bold;\">第{button_id + 1}組矛盾 </div>" + trg_news_content
     
     contradictory_html_code = re.sub(rf"{content_replace_block}[\S\s]*{content_replace_block}", f"{content_replace_block}{trg_news_content}{content_replace_block}", contradictory_html_code)
     
@@ -300,3 +300,241 @@ def set_contradiction_hidden_button(contradictory_html_output):
     for i in range(50): # the max limit of contradictory triples is 50
         hidden_btn = gr.Button(visible = False, elem_id=f"hidden_button_{i}")
         hidden_btn.click(fn = contradictory_button_press, inputs = gr.State(i), outputs = contradictory_html_output)  
+
+
+def title_score_transform(title_score_dict: dict[str, int]):
+    """
+    負面詞彙：文本整體描述是否為相較負面。  （ 數值從 0 至 100 ）
+    
+    命令或挑釁語氣：是否有命令讀者的舉動。  （ 數值從 0 至 100 ）
+    
+    絕對化語言：對於事件描述是否過於極端。  （ 數值從 0 至 100 ）
+    """
+    ret_score_dict = dict()
+
+    for feature, score in title_score_dict.items():
+        score = int(score)
+        if 0 <= score <= 20:
+            ret_score_dict[feature] = f"（{score}％）： 幾乎無相關特徵"
+        elif 21 <= score <= 50:
+            ret_score_dict[feature] = f"（{score}％）： 有部分特徵，但不明顯"
+        elif 51 <= score <= 70:
+            ret_score_dict[feature] = f"（{score}％）： 較為明顯，可能影響讀者判斷"
+        else:
+            ret_score_dict[feature] = f"（{score}％）： 特徵極為明顯"
+
+    return ret_score_dict
+
+def sentence_score_transform(sentence_score_dict: dict[str, int]):
+    """
+    情感分析： 句子整體是正面、負面或者中立。 （ 數值從 -100 至 100 ）
+    
+    主觀性： 句子是否具有主觀性。           （ 數值從 0 至 100 ）
+    """
+    ret_score_dict = dict()
+    
+    ## 情感分析
+    # value range is converted to [0, 100] (極正面 ~ 極負面)
+    emotion = int((sentence_score_dict['情感分析'] * (-1) + 100) / 2)
+
+    if 0 <= emotion <= 20:
+        ret_score_dict['情感分析'] = f"（{emotion}％）： 非常正面"
+    elif 21 <= emotion <= 40:
+        ret_score_dict['情感分析'] = f"（{emotion}％）： 偏正面"
+    elif 41 <= emotion <= 60:
+        ret_score_dict['情感分析'] = f"（{emotion}％）： 中性"
+    elif 61 <= emotion <= 80:
+        ret_score_dict['情感分析'] = f"（{emotion}％）： 偏負面"
+    else:
+        ret_score_dict['情感分析'] = f"（{emotion}％）： 非常負面"
+    
+    ## 主觀性
+    subjective = int(sentence_score_dict['主觀性'])
+    if 0 <= subjective <= 20:
+        ret_score_dict['主觀性'] = f"（{subjective}％）： 幾乎客觀"
+    elif 21 <= subjective <= 40:
+        ret_score_dict['主觀性'] = f"（{subjective}％）： 稍微主觀"
+    elif 41 <= subjective <= 60:
+        ret_score_dict['主觀性'] = f"（{subjective}％）： 中度主觀"
+    elif 61 <= subjective <= 80:
+        ret_score_dict['主觀性'] = f"（{subjective}％）： 偏主觀"
+    else:
+        ret_score_dict['主觀性'] = f"（{subjective}％）： 非常主觀"
+
+    return ret_score_dict
+
+def fake_score_transform(fake_score):
+    
+    if fake_score > 67:
+        judgment = "高機率假新聞"
+    elif fake_score < 15:
+        judgment = "高可信度真新聞"
+    else:
+        judgment = "可能為真也可能為假，建議進一步查證"
+
+    return judgment
+
+summary_html_template = r"""
+<style>
+.dashboard-container {
+  display: flex;
+  flex-wrap: wrap; 
+  justify-content: center;
+  gap: 1rem;
+  width: 90%;
+  max-width: 1200px;
+  margin: auto;
+}
+
+.dashboard {
+  flex: 1 1 200px;
+  max-width: 30%;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.score-light {
+  font-size: 250%;
+  fill: white;
+  text-anchor: middle;
+}
+
+.text-light {
+  font-size: 2vw;
+}
+
+@media (max-width: 1023px) {
+  .dashboard {
+    max-width: 100%;
+    flex-basis: 100%;
+  }
+}
+
+svg {
+  width: 100%;
+  height: auto;
+}
+</style>
+
+<!-- dashboard left point(20, 150), right point(280, 150) radius(130, 130)(一個水平半徑、一個垂直半徑，在此為正圓故相同)-->
+<!-- 角度計算公式: 請看 updateGauge -->
+
+<div class="dashboard-container">
+  <!-- 假新聞機率儀錶板 -->
+  <span class="dashboard">
+    <span class="text-light">假新聞機率</span>
+    <svg viewBox="0 0 300 150">
+      
+      <!-- 0 ~ 15 【 高可信度真新聞 】-->
+      <path d="M 20 150 A 130 130 0 0 1 34.16 90.98" fill="none" stroke="green" stroke-width="20" stroke-linecap="butt" />
+      
+      <!-- 15 ~ 67 【 可能為真也可能為假，建議進一步查證 】-->
+      <path d="M 34.16 90.98 A 130 130 0 0 1 216.17 38.10" fill="none" stroke="orange" stroke-width="20" stroke-linecap="butt" />
+      
+      <!-- 67 ~ 100 【 高機率假新聞 】-->
+      <path d="M 216.17 38.10 A 130 130 0 0 1 280 150" fill="none" stroke="red" stroke-width="20" stroke-linecap="butt" />
+      <text x="150" y="120" class = "score-light">fake_score</text>
+      
+      <circle class="pin" r="8" fill="gray" cx="fake_x" cy="fake_y"/>
+    </svg>
+    <span class="text-light" style="font-size: 15px">fake_text</span>
+  </span>
+
+  <!-- 情感分析儀錶板 -->
+  <span class="dashboard">
+    <span class="text-light">情感分析</span>
+    <svg viewBox="0 0 300 150">
+      
+      <path d="M 20 150 A 130 130 0 0 1 44.82 73.58" fill="none" stroke="green" stroke-width="20" stroke-linecap="butt" />
+      
+      <path d="M 44.82 73.5 A 130 130 0 0 1 109.82 26.36" fill="none" stroke="#7FFF00" stroke-width="20" stroke-linecap="butt" />
+      
+      <path d="M 109.82 26.36 A 130 130 0 0 1 190.1 26.36" fill="none" stroke="#FFFF00" stroke-width="20" stroke-linecap="butt" />
+
+      <path d="M 190.1 26.36 A 130 130 0 0 1 255.1 73.5" fill="none" stroke="#FF7F00" stroke-width="20" stroke-linecap="butt" />
+
+      <path d="M 255.1 73.5 A 130 130 0 0 1 280 150" fill="none" stroke="#FF0000" stroke-width="20" stroke-linecap="butt" />
+
+      <text x="150" y="120" class = "score-light">emotion_score</text>
+      
+      <circle class="pin" r="8" fill="gray" cx="emotion_x" cy="emotion_y" />
+    </svg>
+    <span class="text-light" style="font-size: 15px">emotion_text</span>
+  </span>
+
+  <!-- 主觀性儀錶板 -->
+  <span class="dashboard">
+    <span class="text-light">主觀性</span>
+    <svg viewBox="0 0 300 150">
+      
+      <path d="M 20 150 A 130 130 0 0 1 44.82 73.58" fill="none" stroke="green" stroke-width="20" stroke-linecap="butt" />
+      
+      <path d="M 44.82 73.5 A 130 130 0 0 1 109.82 26.36" fill="none" stroke="#7FFF00" stroke-width="20" stroke-linecap="butt" />
+      
+      <path d="M 109.82 26.36 A 130 130 0 0 1 190.1 26.36" fill="none" stroke="#FFFF00" stroke-width="20" stroke-linecap="butt" />
+
+      <path d="M 190.1 26.36 A 130 130 0 0 1 255.1 73.5" fill="none" stroke="#FF7F00" stroke-width="20" stroke-linecap="butt" />
+
+      <path d="M 255.1 73.5 A 130 130 0 0 1 280 150" fill="none" stroke="#FF0000" stroke-width="20" stroke-linecap="butt" />
+
+      <text x="150" y="120" class = "score-light">subjective_score</text>
+      
+      <circle class="pin" r="8" fill="gray" cx="subjective_x" cy="subjective_y" />
+    </svg>
+    <span class="text-light" style="font-size: 15px">subjective_text</span>
+  </span>
+</div>
+"""
+
+## Summary Part
+
+def calc_position(value):
+  # value range from 0 to 100, return the position(cx, cy)
+  import math
+  value = value - 50
+  angle = -90 + (value / 100) * 180
+  radius = 130
+  center_x = 150
+  center_y = 150
+
+  rad = (angle * math.pi) / 180
+  pin_x = center_x + radius * math.cos(rad)
+  pin_y = center_y + radius * math.sin(rad)
+  return (pin_x, pin_y)
+
+def update_summary_part(fake_score, sentence_summary_scores):
+    
+    fake_x, fake_y = calc_position(fake_score)
+    emotion_score, subjective_score = int((sentence_summary_scores['情感分析'] * (-1) + 100) / 2), int(sentence_summary_scores['主觀性'])
+    emotion_x, emotion_y = calc_position(emotion_score)
+    subjective_x, subjective_y = calc_position(subjective_score)
+    
+    summary_html_code = summary_html_template
+    for placeholder, val in [('fake_x', fake_x), ('fake_y', fake_y), 
+                             ('emotion_x', emotion_x), ('emotion_y', emotion_y), 
+                             ('subjective_x', subjective_x), ('subjective_y', subjective_y)]:
+      summary_html_code = summary_html_code.replace(placeholder, str(val))
+    
+    for placeholder, score in [('fake_score', fake_score), ('emotion_score', emotion_score), ('subjective_score', subjective_score)]:
+      if isinstance(score, float):
+        summary_html_code = summary_html_code.replace(placeholder, f"{score:.3f} ％")
+      else:
+        summary_html_code = summary_html_code.replace(placeholder, f"{score} ％")
+
+    fake_text = fake_score_transform(fake_score)
+
+    sentence_summary_score_dict = sentence_score_transform(sentence_summary_scores)
+
+    if '，' in fake_text:
+      fake_text_part1 = fake_text.split('，')[0]
+      fake_text_part2 = fake_text.split('，')[1]
+      summary_html_code = summary_html_code.replace('<span class="text-light" style="font-size: 15px">fake_text</span>', 
+                                                    f'<div class="text-light" style="font-size: 15px">{fake_text_part1}</div>\n' \
+                                                    f'<span class="text-light" style="font-size: 15px">{fake_text_part2}</span>')
+    else:  
+      summary_html_code = summary_html_code.replace('fake_text', fake_text)
+    summary_html_code = summary_html_code.replace('emotion_text', sentence_summary_score_dict['情感分析'].split('：')[1].strip())
+    summary_html_code = summary_html_code.replace('subjective_text', sentence_summary_score_dict['主觀性'].split('：')[1].strip())
+         
+
+    return summary_html_code

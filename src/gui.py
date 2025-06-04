@@ -4,11 +4,11 @@ import gradio as gr
 try:
     from .scores import *
     from .interface import *
-    from .contradictionGUI import *
+    from .otherGUI import *
 except:
     from scores import *
     from interface import *
-    from contradictionGUI import *
+    from otherGUI import *
 
 
 lang_options = {
@@ -54,69 +54,6 @@ def update_labels(language):
         gr.update(value=config["disclaimer"])
     )
 
-
-def title_score_transform(title_score_dict: dict[str, int]):
-    """
-    負面詞彙：文本整體描述是否為相較負面。  （ 數值從 0 至 100 ）
-    
-    命令或挑釁語氣：是否有命令讀者的舉動。  （ 數值從 0 至 100 ）
-    
-    絕對化語言：對於事件描述是否過於極端。  （ 數值從 0 至 100 ）
-    """
-    ret_score_dict = dict()
-
-    for feature, score in title_score_dict.items():
-        score = int(score)
-        if 0 <= score <= 20:
-            ret_score_dict[feature] = f"（{score}％）： 幾乎無相關特徵"
-        elif 21 <= score <= 50:
-            ret_score_dict[feature] = f"（{score}％）： 有部分特徵，但不明顯"
-        elif 51 <= score <= 70:
-            ret_score_dict[feature] = f"（{score}％）： 較為明顯，可能影響讀者判斷"
-        else:
-            ret_score_dict[feature] = f"（{score}％）： 特徵極為明顯"
-
-    return ret_score_dict
-
-def sentence_score_transform(sentence_score_dict: dict[str, int]):
-    """
-    情感分析： 句子整體是正面、負面或者中立。 （ 數值從 -100 至 100 ）
-    
-    主觀性： 句子是否具有主觀性。           （ 數值從 0 至 100 ）
-    """
-    ret_score_dict = dict()
-    
-    ## 情感分析
-    # value range is converted to [0, 100] (極正面 ~ 極負面)
-    emotion = int((sentence_score_dict['情感分析'] * (-1) + 100) / 2)
-
-    if 0 <= emotion <= 20:
-        ret_score_dict['情感分析'] = f"（{emotion}％）： 非常正面"
-    elif 21 <= emotion <= 40:
-        ret_score_dict['情感分析'] = f"（{emotion}％）： 偏正面"
-    elif 41 <= emotion <= 60:
-        ret_score_dict['情感分析'] = f"（{emotion}％）： 中性"
-    elif 61 <= emotion <= 80:
-        ret_score_dict['情感分析'] = f"（{emotion}％）： 偏負面"
-    else:
-        ret_score_dict['情感分析'] = f"（{emotion}％）： 非常負面"
-    
-    ## 主觀性
-    subjective = int(sentence_score_dict['主觀性'])
-    if 0 <= subjective <= 20:
-        ret_score_dict['主觀性'] = f"（{subjective}％）： 幾乎客觀"
-    elif 21 <= subjective <= 40:
-        ret_score_dict['主觀性'] = f"（{subjective}％）： 稍微主觀"
-    elif 41 <= subjective <= 60:
-        ret_score_dict['主觀性'] = f"（{subjective}％）： 中度主觀"
-    elif 61 <= subjective <= 80:
-        ret_score_dict['主觀性'] = f"（{subjective}％）： 偏主觀"
-    else:
-        ret_score_dict['主觀性'] = f"（{subjective}％）： 非常主觀"
-
-    return ret_score_dict
-
-
 def interface_fn(title, content):
     print("\n\n======  開始完整分析  ======\n\n")
     score = 0
@@ -155,23 +92,29 @@ def interface_fn(title, content):
 
     score += prob * 100
     score = min(score, 99.999)
-    if score > 67:
-        judgment = "【 高機率假新聞 】 "
-    elif score < 15:
-        judgment = "【 高可信度真新聞 】 "
-    else:
-        judgment = "\n\t【 可能為真也可能為假，建議進一步查證 】"
     
-    summary = "========================================\n\n"
-    summary += f"      〔 預測為假新聞的機率 ： {score:.3f} ％ 〕   \n\n"
-    summary += f"經過系統判斷此新聞為  {judgment}\n\n"
-    summary += "========================================\n\n"
-    summary += "      〔 句子綜合分數 〕   \n\n"
+    judgment = "" if 15 <= score <= 67 else "\n\t"
+    judgment += f"【 {fake_score_transform(score)} 】 "
+
+    # if score > 67:
+    #     judgment = f"【 {fake_score_transform(score)} 】 "
+    # elif score < 15:
+    #     judgment = f"【 {fake_score_transform(score)} 】 "
+    # else:
+    #     judgment = f"\n\t【 {fake_score_transform(score)} 】"
     
-    sentence_summary_score_dict = sentence_score_transform(sentence_summary_scores)
-    for k, v in sentence_summary_score_dict.items():
-        summary += f"  ・ {k}{v}  \n\n"
-    summary += "========================================"
+    # summary = "========================================\n\n"
+    # summary += f"      〔 預測為假新聞的機率 ： {score:.3f} ％ 〕   \n\n"
+    # summary += f"經過系統判斷此新聞為  {judgment}\n\n"
+    # summary += "========================================\n\n"
+    # summary += "      〔 句子綜合分數 〕   \n\n"
+    
+    # sentence_summary_score_dict = sentence_score_transform(sentence_summary_scores)
+    # for k, v in sentence_summary_score_dict.items():
+    #     summary += f"  ・ {k}{v}  \n\n"
+    # summary += "========================================"
+
+    summary = update_summary_part(score, sentence_summary_scores)
     
     detail += "<h3 style='color: orange;'>標題分析：</h3>\n\n"
     title_score_dict = title_score_transform(title_dict)
@@ -186,7 +129,6 @@ def interface_fn(title, content):
             detail += f"- {term}{sentence_score_dict[term]}\n"
 
     yield summary, detail, mgp_html_title_update, mgp_html_output_update, contrad_html_title_update, contrad_html_output_update
-
 
 def quick_interface_fn(title, content):
     print("\n\n======  開始快速分析  ======\n\n")
@@ -217,23 +159,29 @@ def quick_interface_fn(title, content):
     score += prob * 100
     score = min(score, 99.999)
         
-    if score > 67:
-        judgment = "【 高機率假新聞 】 "
-    elif score < 15:
-        judgment = "【 高可信度真新聞 】 "
-    else:
-        judgment = "\n\t【 可能為真也可能為假，建議進一步查證 】"
+
+    judgment = "" if 15 <= score <= 67 else "\n\t"
+    judgment += f"【 {fake_score_transform(score)} 】 "
+
+    # if score > 67:
+    #     judgment = f"【 {fake_score_transform(score)} 】 "
+    # elif score < 15:
+    #     judgment = f"【 {fake_score_transform(score)} 】 "
+    # else:
+    #     judgment = f"\n\t【 {fake_score_transform(score)} 】"
     
-    summary = "========================================\n\n"
-    summary += f"      〔 預測為假新聞的機率 ： {score:.3f} ％ 〕   \n\n"
-    summary += f"經過系統判斷此新聞為  {judgment}\n\n"
-    summary += "========================================\n\n"
-    summary += "      〔 句子綜合分數 〕   \n\n"
+    # summary = "========================================\n\n"
+    # summary += f"      〔 預測為假新聞的機率 ： {score:.3f} ％ 〕   \n\n"
+    # summary += f"經過系統判斷此新聞為  {judgment}\n\n"
+    # summary += "========================================\n\n"
+    # summary += "      〔 句子綜合分數 〕   \n\n"
     
-    sentence_summary_score_dict = sentence_score_transform(sentence_summary_scores)
-    for k, v in sentence_summary_score_dict.items():
-        summary += f"  ・ {k}{v}  \n\n"
-    summary += "========================================"
+    # sentence_summary_score_dict = sentence_score_transform(sentence_summary_scores)
+    # for k, v in sentence_summary_score_dict.items():
+    #     summary += f"  ・ {k}{v}  \n\n"
+    # summary += "========================================"
+
+    summary = update_summary_part(score, sentence_summary_scores)
     
     detail += "<h3 style='color: orange;'>標題分析：</h3>\n\n"
     title_score_dict = title_score_transform(title_dict)
@@ -272,8 +220,7 @@ with gr.Blocks() as demo:
                 
 
         with gr.Column():
-            # output_summary = gr.Markdown("### 分析結果")
-            output_summary = gr.Textbox(label="分析結果")
+            output_summary = gr.HTML()
             with gr.Accordion(label="點我展開查看詳細分析", open=False) as accordion_box:
                 output_detail = gr.Markdown()
     
