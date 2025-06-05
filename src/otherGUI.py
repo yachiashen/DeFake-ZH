@@ -23,6 +23,16 @@ global_sentences = None
 html_code_template = """
 <style>
 
+:root[data-theme="dark"] {
+  --background-color: black;
+  --text-color: white;
+}
+
+:root[data-theme="light"] {
+  --background-color: white;
+  --text-color: black;
+}
+
 .mark_area{
   font-weight: bold;
   color: #faa37a !important;
@@ -31,11 +41,12 @@ html_code_template = """
 .title {
     font-size: 20px;
     font-weight:bold;
-    color: black !important;
+    color: var(--text-color) !important;
 }
+
 .content {
     font-size: 16px;
-    color: black !important;
+    color: var(--text-color) !important;
 }
 
 .scrollable-block-left {
@@ -46,10 +57,23 @@ html_code_template = """
   overflow-x: hidden;
   padding: 10px;
   border: 1px solid #ccc;
-  background-color: #FFFFFF;
+  background-color: var(--background-color);
   border-radius: 8px;
   font-size: 14px;
   line-height: 1.5;
+}
+
+.scrollable-block-left::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollable-block-left::-webkit-scrollbar-thumb {
+  background-color: var(--text-color);
+  border-radius: 4px;
+}
+
+.scrollable-block-left::-webkit-scrollbar-track {
+  background-color: var(--background-color);
 }
 
 .scrollable-block-mid {
@@ -60,10 +84,23 @@ html_code_template = """
   overflow-x: hidden;
   padding: 10px;
   border: 1px solid #ccc;
-  background-color: #FFFFFF;
+  background-color: var(--background-color);
   border-radius: 8px;
   font-size: 14px;
   line-height: 1.5;
+}
+
+.scrollable-block-mid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollable-block-mid::-webkit-scrollbar-thumb {
+  background-color: var(--text-color);
+  border-radius: 4px;
+}
+
+.scrollable-block-mid::-webkit-scrollbar-track {
+  background-color: var(--background-color);
 }
 
 .choice-block-right {
@@ -76,8 +113,21 @@ html_code_template = """
   padding: 10px;
   min-width: 6%;
   max-width: 6%;
-  background: #FFFFFF;
+  background: var(--background-color);
   border-radius: 8px;
+}
+
+.choice-block-right::-webkit-scrollbar {
+  width: 8px;
+}
+
+.choice-block-right::-webkit-scrollbar-thumb {
+  background-color: var(--text-color);
+  border-radius: 4px;
+}
+
+.choice-block-right::-webkit-scrollbar-track {
+  background-color: var(--background-color);
 }
 
 .choice-block-right button {
@@ -90,13 +140,23 @@ html_code_template = """
   font-size: 20px;
   font-weight: bold;
 }
+
 .choice-block-right button:hover {
-  background-color: white;
-  color: black;
+  background-color: var(--background-color);
+  color: var(--text-color);
 }
 
 .ref-news-block {
-  color: black !important;
+  color: var(--text-color) !important;
+}
+
+.ref-news-block a {
+  color: var(--text-color) !important;
+  text-decoration: underline;
+}
+
+.ref-news-block a:hover {
+  opacity: 0.8;
 }
 </style>
 
@@ -147,7 +207,7 @@ def mgp_button_press(button_id):
     else:
         mgp_html_code = re.sub(rf"{title_replace_block}[\S\s]*{title_replace_block}", f"{title_replace_block}{global_title}{title_replace_block}", mgp_html_code)
     trg_news_content = ''.join([ f"<span class=\"mark_area\">{stn}</span>"  if t2s.convert(stn.strip()) == t2s.convert(trg_sentence.strip()) else stn for stn in global_sentences ])
-    trg_news_content = f"<div class=\"content\" style=\"font-weight: bold;\"> 第{button_id + 1}組相似 </div>" + trg_news_content
+    trg_news_content = f"<div class=\"content\" style=\"font-weight: bold;\"> 【 第{button_id + 1}組相似 】 </div><br>" + trg_news_content
 
     mgp_html_code = re.sub(rf"{content_replace_block}[\S\s]*{content_replace_block}", f"{content_replace_block}{trg_news_content}{content_replace_block}", mgp_html_code)
 
@@ -158,8 +218,8 @@ def mgp_button_press(button_id):
     content = ''.join([ f"<span class=\"mark_area\">{stn}</span>"  if t2s.convert(stn) == ref_sentence else stn for stn in raw_sentences ])
     replace_text = f"""
 {ref_news_replace_block}
-<div class = "title">{title}</div><br>
-<div class=\"ref-news-block\" left="0">網址：<a href=\"{sentence_dict[button_id]['url']}\" target="_blank">{sentence_dict[button_id]['url']}</a></div>
+<div class = "title"> 《 {title} 》 </div><br>
+<div class=\"ref-news-block\" left="0"> 【 SOURCE ： MyGoPen 】 <br> 【 URL ： <a href=\"{sentence_dict[button_id]['url']}\" target="_blank">{sentence_dict[button_id]['url']}</a> 】 </div><br>
 <div class = "content">{content}</div>
 {ref_news_replace_block}
 """
@@ -222,7 +282,7 @@ def contradictory_button_press(button_id):
     trg_news_content = ''.join(global_sentences[:sentence_idx] + 
                                [mark_triple_in_sentence(global_sentences[sentence_idx], trps_dict[button_id]['trg_trp'])] + 
                                global_sentences[sentence_idx + 1:])
-    trg_news_content = f"<div class=\"content\" style=\"font-weight: bold;\">第{button_id + 1}組矛盾 </div>" + trg_news_content
+    trg_news_content = f"<div class=\"content\" style=\"font-weight: bold;\"> 【 第{button_id + 1}組矛盾 】 </div><br>" + trg_news_content
     
     contradictory_html_code = re.sub(rf"{content_replace_block}[\S\s]*{content_replace_block}", f"{content_replace_block}{trg_news_content}{content_replace_block}", contradictory_html_code)
     
@@ -232,8 +292,8 @@ def contradictory_button_press(button_id):
     
     replace_text = f"""
 {ref_news_replace_block}
-<div class = "title">{trps_dict[button_id]['title']}</div><br>
-<div class=\"ref-news-block\" left="0">參考新聞來源：{news_source(trps_dict[button_id]['url'])}｜網址：<a href=\"{trps_dict[button_id]['url']}\" target="_blank">{trps_dict[button_id]['url']}</a></div>
+<div class = "title"> 《 {trps_dict[button_id]['title']} 》 </div><br>
+<div class=\"ref-news-block\" left="0"> 【 SOURCE ： {news_source(trps_dict[button_id]['url'])} 】 <br> 【 URL ： <a href=\"{trps_dict[button_id]['url']}\" target="_blank">{trps_dict[button_id]['url']}</a> 】 </div><br>
 <div class = "content">{ref_sentence_with_trp_mark}</div><br>
 {ref_news_replace_block}
 """
@@ -383,7 +443,8 @@ def fake_score_transform(fake_score):
 
     return judgment
 
-summary_html_template = r"""
+
+summary_html_template = """
 <style>
 .dashboard-container {
   display: flex;
@@ -405,6 +466,7 @@ summary_html_template = r"""
 .score-light {
   font-size: 250%;
   fill: white;
+  mix-blend-mode: difference;
   text-anchor: middle;
 }
 
@@ -433,18 +495,24 @@ svg {
   <span class="dashboard">
     <span class="text-light">假新聞機率</span>
     <svg viewBox="0 0 300 150">
+      <defs>
+        <!-- 定義漸層 -->
+        <linearGradient id="gradient_fake" x1="100%" y1="0%" x2="0%" y2="0%">
+          <stop offset="0%" style="stop-color:#800080;stop-opacity:1" />
+          <stop offset="12.5%" style="stop-color:#8B0000;stop-opacity:1" />
+          <stop offset="25%" style="stop-color:#FF0000;stop-opacity:1" />
+          <stop offset="37.5%" style="stop-color:#FF4500;stop-opacity:1" />
+          <stop offset="50%" style="stop-color:#FFA500;stop-opacity:1" />
+          <stop offset="62.5%" style="stop-color:#FFFF00;stop-opacity:1" />
+          <stop offset="75%" style="stop-color:#7FFF00;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#008000;stop-opacity:1" />
+        </linearGradient>
+      </defs>
       
-      <!-- 0 ~ 15 【 高可信度真新聞 】-->
-      <path d="M 20 150 A 130 130 0 0 1 34.16 90.98" fill="none" stroke="green" stroke-width="20" stroke-linecap="butt" />
-      
-      <!-- 15 ~ 67 【 可能為真也可能為假，建議進一步查證 】-->
-      <path d="M 34.16 90.98 A 130 130 0 0 1 216.17 38.10" fill="none" stroke="orange" stroke-width="20" stroke-linecap="butt" />
-      
-      <!-- 67 ~ 100 【 高機率假新聞 】-->
-      <path d="M 216.17 38.10 A 130 130 0 0 1 280 150" fill="none" stroke="red" stroke-width="20" stroke-linecap="butt" />
-      <text x="150" y="120" class = "score-light">fake_score</text>
-      
-      <circle class="pin" r="8" fill="gray" cx="fake_x" cy="fake_y"/>
+      <!-- 使用漸層 -->
+      <path d="M 280 150 A 130 130 0 0 0 20 150" fill="none" stroke="url(#gradient_fake)" stroke-width="20" stroke-linecap="butt" />
+      <text x="150" y="120" class="score-light">fake_score</text>
+      <polygon points="fake_x1,fake_y1 fake_x2,fake_y2 fake_x3,fake_y3" fill="#C0C0C0"/>
     </svg>
     <span class="text-light" style="font-size: 15px">fake_text</span>
   </span>
@@ -453,20 +521,24 @@ svg {
   <span class="dashboard">
     <span class="text-light">情感分析</span>
     <svg viewBox="0 0 300 150">
+      <defs>
+        <!-- 定義漸層 -->
+        <linearGradient id="gradient_emotion" x1="100%" y1="0%" x2="0%" y2="0%">
+          <stop offset="0%" style="stop-color:#800080;stop-opacity:1" />
+          <stop offset="12.5%" style="stop-color:#8B0000;stop-opacity:1" />
+          <stop offset="25%" style="stop-color:#FF0000;stop-opacity:1" />
+          <stop offset="37.5%" style="stop-color:#FF4500;stop-opacity:1" />
+          <stop offset="50%" style="stop-color:#FFA500;stop-opacity:1" />
+          <stop offset="62.5%" style="stop-color:#FFFF00;stop-opacity:1" />
+          <stop offset="75%" style="stop-color:#7FFF00;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#008000;stop-opacity:1" />
+        </linearGradient>
+      </defs>
       
-      <path d="M 20 150 A 130 130 0 0 1 44.82 73.58" fill="none" stroke="green" stroke-width="20" stroke-linecap="butt" />
-      
-      <path d="M 44.82 73.5 A 130 130 0 0 1 109.82 26.36" fill="none" stroke="#7FFF00" stroke-width="20" stroke-linecap="butt" />
-      
-      <path d="M 109.82 26.36 A 130 130 0 0 1 190.1 26.36" fill="none" stroke="#FFFF00" stroke-width="20" stroke-linecap="butt" />
-
-      <path d="M 190.1 26.36 A 130 130 0 0 1 255.1 73.5" fill="none" stroke="#FF7F00" stroke-width="20" stroke-linecap="butt" />
-
-      <path d="M 255.1 73.5 A 130 130 0 0 1 280 150" fill="none" stroke="#FF0000" stroke-width="20" stroke-linecap="butt" />
-
-      <text x="150" y="120" class = "score-light">emotion_score</text>
-      
-      <circle class="pin" r="8" fill="gray" cx="emotion_x" cy="emotion_y" />
+      <!-- 使用漸層 -->
+      <path d="M 280 150 A 130 130 0 0 0 20 150" fill="none" stroke="url(#gradient_emotion)" stroke-width="20" stroke-linecap="butt" />
+      <text x="150" y="120" class="score-light">emotion_score</text>
+      <polygon points="emotion_x1,emotion_y1 emotion_x2,emotion_y2 emotion_x3,emotion_y3" fill="#C0C0C0"/>
     </svg>
     <span class="text-light" style="font-size: 15px">emotion_text</span>
   </span>
@@ -475,20 +547,24 @@ svg {
   <span class="dashboard">
     <span class="text-light">主觀性</span>
     <svg viewBox="0 0 300 150">
+      <defs>
+        <!-- 定義漸層 -->
+        <linearGradient id="gradient_subjective" x1="100%" y1="0%" x2="0%" y2="0%">
+          <stop offset="0%" style="stop-color:#800080;stop-opacity:1" />
+          <stop offset="12.5%" style="stop-color:#8B0000;stop-opacity:1" />
+          <stop offset="25%" style="stop-color:#FF0000;stop-opacity:1" />
+          <stop offset="37.5%" style="stop-color:#FF4500;stop-opacity:1" />
+          <stop offset="50%" style="stop-color:#FFA500;stop-opacity:1" />
+          <stop offset="62.5%" style="stop-color:#FFFF00;stop-opacity:1" />
+          <stop offset="75%" style="stop-color:#7FFF00;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#008000;stop-opacity:1" />
+        </linearGradient>
+      </defs>
       
-      <path d="M 20 150 A 130 130 0 0 1 44.82 73.58" fill="none" stroke="green" stroke-width="20" stroke-linecap="butt" />
-      
-      <path d="M 44.82 73.5 A 130 130 0 0 1 109.82 26.36" fill="none" stroke="#7FFF00" stroke-width="20" stroke-linecap="butt" />
-      
-      <path d="M 109.82 26.36 A 130 130 0 0 1 190.1 26.36" fill="none" stroke="#FFFF00" stroke-width="20" stroke-linecap="butt" />
-
-      <path d="M 190.1 26.36 A 130 130 0 0 1 255.1 73.5" fill="none" stroke="#FF7F00" stroke-width="20" stroke-linecap="butt" />
-
-      <path d="M 255.1 73.5 A 130 130 0 0 1 280 150" fill="none" stroke="#FF0000" stroke-width="20" stroke-linecap="butt" />
-
-      <text x="150" y="120" class = "score-light">subjective_score</text>
-      
-      <circle class="pin" r="8" fill="gray" cx="subjective_x" cy="subjective_y" />
+      <!-- 使用漸層 -->
+      <path d="M 280 150 A 130 130 0 0 0 20 150" fill="none" stroke="url(#gradient_subjective)" stroke-width="20" stroke-linecap="butt" />
+      <text x="150" y="120" class="score-light">subjective_score</text>
+      <polygon points="subjective_x1,subjective_y1 subjective_x2,subjective_y2 subjective_x3,subjective_y3" fill="#C0C0C0"/>
     </svg>
     <span class="text-light" style="font-size: 15px">subjective_text</span>
   </span>
@@ -498,50 +574,75 @@ svg {
 ## Summary Part
 
 def calc_position(value):
-  # value range from 0 to 100, return the position(cx, cy)
-  import math
-  value = value - 50
-  angle = -90 + (value / 100) * 180
-  radius = 130
-  center_x = 150
-  center_y = 150
+    # value range from 0 to 100, return the position of arrow points
+    import math
+    value = value - 50
+    angle = -90 + (value / 100) * 180
+    radius = 150
+    center_x = 150
+    center_y = 150
 
-  rad = (angle * math.pi) / 180
-  pin_x = center_x + radius * math.cos(rad)
-  pin_y = center_y + radius * math.sin(rad)
-  return (pin_x, pin_y)
+    rad = (angle * math.pi) / 180
+    
+    tip_x = center_x + (radius - 20) * math.cos(rad)
+    tip_y = center_y + (radius - 20) * math.sin(rad)
+    
+    arrow_width = 10
+    
+    back_center_x = center_x + radius * math.cos(rad)
+    back_center_y = center_y + radius * math.sin(rad)
+    
+    perp_x = -math.sin(rad)
+    perp_y = math.cos(rad)
+    
+    left_x = back_center_x + arrow_width * perp_x
+    left_y = back_center_y + arrow_width * perp_y
+    right_x = back_center_x - arrow_width * perp_x
+    right_y = back_center_y - arrow_width * perp_y
+    
+    return (tip_x, tip_y, left_x, left_y, right_x, right_y)
 
 def update_summary_part(fake_score, sentence_summary_scores):
     
-    fake_x, fake_y = calc_position(fake_score)
-    emotion_score, subjective_score = int((sentence_summary_scores['情感分析'] * (-1) + 100) / 2), int(sentence_summary_scores['主觀性'])
-    emotion_x, emotion_y = calc_position(emotion_score)
-    subjective_x, subjective_y = calc_position(subjective_score)
+    fake_x1, fake_y1, fake_x2, fake_y2, fake_x3, fake_y3 = calc_position(fake_score)
+    emotion_score = int((sentence_summary_scores['情感分析'] * (-1) + 100) / 2)
+    emotion_x1, emotion_y1, emotion_x2, emotion_y2, emotion_x3, emotion_y3 = calc_position(emotion_score)
+    subjective_score = int(sentence_summary_scores['主觀性'])
+    subjective_x1, subjective_y1, subjective_x2, subjective_y2, subjective_x3, subjective_y3 = calc_position(subjective_score)
     
     summary_html_code = summary_html_template
-    for placeholder, val in [('fake_x', fake_x), ('fake_y', fake_y), 
-                             ('emotion_x', emotion_x), ('emotion_y', emotion_y), 
-                             ('subjective_x', subjective_x), ('subjective_y', subjective_y)]:
-      summary_html_code = summary_html_code.replace(placeholder, str(val))
+    for placeholder, val in [
+        ('fake_x1', fake_x1), ('fake_y1', fake_y1),
+        ('fake_x2', fake_x2), ('fake_y2', fake_y2),
+        ('fake_x3', fake_x3), ('fake_y3', fake_y3),
+        ('emotion_x1', emotion_x1), ('emotion_y1', emotion_y1),
+        ('emotion_x2', emotion_x2), ('emotion_y2', emotion_y2),
+        ('emotion_x3', emotion_x3), ('emotion_y3', emotion_y3),
+        ('subjective_x1', subjective_x1), ('subjective_y1', subjective_y1),
+        ('subjective_x2', subjective_x2), ('subjective_y2', subjective_y2),
+        ('subjective_x3', subjective_x3), ('subjective_y3', subjective_y3)
+    ]:
+        summary_html_code = summary_html_code.replace(placeholder, str(val))
+
     
     for placeholder, score in [('fake_score', fake_score), ('emotion_score', emotion_score), ('subjective_score', subjective_score)]:
-      if isinstance(score, float):
-        summary_html_code = summary_html_code.replace(placeholder, f"{score:.3f} ％")
-      else:
-        summary_html_code = summary_html_code.replace(placeholder, f"{score} ％")
+        if isinstance(score, float):
+            summary_html_code = summary_html_code.replace(placeholder, f"{score:.3f} ％")
+        else:
+            summary_html_code = summary_html_code.replace(placeholder, f"{score} ％")
 
     fake_text = fake_score_transform(fake_score)
 
     sentence_summary_score_dict = sentence_score_transform(sentence_summary_scores)
 
     if '，' in fake_text:
-      fake_text_part1 = fake_text.split('，')[0]
-      fake_text_part2 = fake_text.split('，')[1]
-      summary_html_code = summary_html_code.replace('<span class="text-light" style="font-size: 15px">fake_text</span>', 
-                                                    f'<div class="text-light" style="font-size: 15px">{fake_text_part1}</div>\n' \
-                                                    f'<span class="text-light" style="font-size: 15px">{fake_text_part2}</span>')
+        fake_text_part1 = fake_text.split('，')[0]
+        fake_text_part2 = fake_text.split('，')[1]
+        summary_html_code = summary_html_code.replace('<span class="text-light" style="font-size: 15px">fake_text</span>', 
+                                                      f'<div class="text-light" style="font-size: 15px">{fake_text_part1}</div>\n' \
+                                                      f'<span class="text-light" style="font-size: 15px">{fake_text_part2}</span>')
     else:  
-      summary_html_code = summary_html_code.replace('fake_text', fake_text)
+        summary_html_code = summary_html_code.replace('fake_text', fake_text)
     summary_html_code = summary_html_code.replace('emotion_text', sentence_summary_score_dict['情感分析'].split('：')[1].strip())
     summary_html_code = summary_html_code.replace('subjective_text', sentence_summary_score_dict['主觀性'].split('：')[1].strip())
          
