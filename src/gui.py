@@ -60,13 +60,13 @@ def interface_fn(title, content):
     
     title, content = re.sub(r'\s+', '', title), re.sub(r'\s+', '', content)
     if not isinstance(content, str) or content == "":
-        yield "〔 請輸入新聞內容再進行分析 〕", "", "", "", "", ""
+        yield "〔 請輸入新聞內容再進行分析 〕", "", "", "", "", "", "", "", "", ""
         return 
     
-    yield "［1/4］正在搜尋 MGP 資料庫...", "", "", "", "", ""
+    yield "［1/4］正在搜尋 MGP 資料庫...", "", "", "", "", "", title, content, "", ""
     
     ### MGP Part
-    mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_bool = update_mgp_part(title, content)
+    mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_bool, mgp_html_code = update_mgp_part(title, content)
     detail = f"\n<h3 style='color: orange;'>MGP 資料搜尋結果：</h3>\n\n"
     detail += mgp_description + "\n\n"
     
@@ -74,10 +74,10 @@ def interface_fn(title, content):
         score += 33.333
         print(f"\n[MGP] : score += 33.333, current score = {score}\n")
     
-    yield "［2/4］ MGP 資料庫比對完成，正在檢查邏輯矛盾...", detail, mgp_html_title_update, mgp_html_output_update, "", ""
+    yield "［2/4］ MGP 資料庫比對完成，正在檢查邏輯矛盾...", detail, mgp_html_title_update, mgp_html_output_update, "", "", title, content, mgp_html_code, ""
     
     ### Contradiction Part
-    contrad_html_title_update, contrad_html_output_update, contrad_description, contrad_bool = update_contradiction_part(title, content)
+    contrad_html_title_update, contrad_html_output_update, contrad_description, contrad_bool, contrad_html_code = update_contradiction_part(title, content)
     detail += f"\n<h3 style='color: orange;'>三元組搜尋矛盾結果：</h3>\n\n"
     detail += contrad_description + "\n\n"
     
@@ -85,7 +85,7 @@ def interface_fn(title, content):
         score += 33.333
         print(f"\n[CONTRAD] : score += 33.333, current score = {score}\n")
 
-    yield "［3/4］邏輯矛盾比對完成，正在分析標題與內文...", detail, mgp_html_title_update, mgp_html_output_update, contrad_html_title_update, contrad_html_output_update
+    yield "［3/4］邏輯矛盾比對完成，正在分析標題與內文...", detail, mgp_html_title_update, mgp_html_output_update, contrad_html_title_update, contrad_html_output_update, title, content, mgp_html_code, contrad_html_code
 
     news_sentences, title_dict, sentences_dict, sentence_summary_scores, prob = get_all_scores(title, content)
     print(f"\n[BERT] : prob = {prob * 100}\n")
@@ -128,7 +128,7 @@ def interface_fn(title, content):
         for term in ['情感分析', '主觀性']:
             detail += f"- {term}{sentence_score_dict[term]}\n"
 
-    yield summary, detail, mgp_html_title_update, mgp_html_output_update, contrad_html_title_update, contrad_html_output_update
+    yield summary, detail, mgp_html_title_update, mgp_html_output_update, contrad_html_title_update, contrad_html_output_update, title, content, mgp_html_code, contrad_html_code
 
 def quick_interface_fn(title, content):
     print("\n\n======  開始快速分析  ======\n\n")
@@ -136,14 +136,14 @@ def quick_interface_fn(title, content):
 
     title, content = re.sub(r'\s+', '', title), re.sub(r'\s+', '', content)
     if not isinstance(content, str) or content == "":
-        yield "〔 請輸入新聞內容再進行分析 〕", "", "", "", "", ""
+        yield "〔 請輸入新聞內容再進行分析 〕", "", "", "", "", "", "", "", "", ""
         return 
     
-    yield "［1/3］正在搜尋 MGP 資料庫...", "", "", "", "", ""
+    yield "［1/4］正在搜尋 MGP 資料庫...", "", "", "", "", "", title, content, "", ""
 
-    
+
     ### MGP Part
-    mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_bool = update_mgp_part(title, content)
+    mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_bool, mgp_html_code = update_mgp_part(title, content)
     detail = f"\n<h3 style='color: orange;'>MGP 資料搜尋結果：</h3>\n\n"
     detail += mgp_description + "\n\n"
 
@@ -151,7 +151,7 @@ def quick_interface_fn(title, content):
         score += 33.333
         print(f"\n[MGP] : score += 33.333, current score = {score}\n")
     
-    yield "［2/3］ MGP 資料庫比對完成，正在分析標題與內文...", detail, mgp_html_title_update, mgp_html_output_update, "", ""
+    yield "［2/3］ MGP 資料庫比對完成，正在分析標題與內文...", detail, mgp_html_title_update, mgp_html_output_update, "", "", title, content, mgp_html_code, ""
 
     news_sentences, title_dict, sentences_dict, sentence_summary_scores, prob = get_all_scores(title, content)
     print(f"\n[BERT] : prob = {prob * 100}\n")
@@ -195,8 +195,7 @@ def quick_interface_fn(title, content):
         for term in ['情感分析', '主觀性']:
             detail += f"- {term}{sentence_score_dict[term]}\n"
 
-    yield summary, detail, mgp_html_title_update, mgp_html_output_update, "", ""
-
+    yield summary, detail, mgp_html_title_update, mgp_html_output_update, "", "", title, content, mgp_html_code, ""
 
 with gr.Blocks() as demo:
     # gr.Markdown("# DeFake-ZH")
@@ -224,17 +223,22 @@ with gr.Blocks() as demo:
             with gr.Accordion(label="點我展開查看詳細分析", open=False) as accordion_box:
                 output_detail = gr.Markdown()
     
+    hidden_title_textbox = gr.Textbox(value = "", visible = False)
+    hidden_content_textbox = gr.Textbox(value = "", visible = False)
+    hidden_mgp_textbox = gr.Textbox(value = "", visible = False)
+    hidden_contrad_textbox = gr.Textbox(value = "", visible = False)
+
     ## MGP Part
     mgp_html_title = gr.HTML()
     mgp_html_output = gr.HTML()
-    set_mgp_hidden_button(mgp_html_output)
+    set_mgp_hidden_button(mgp_html_output, hidden_title_textbox, hidden_content_textbox, hidden_mgp_textbox)
     
     ## Contradiction Part 
     contradictory_html_title = gr.HTML()
     contradictory_html_output = gr.HTML()
-    set_contradiction_hidden_button(contradictory_html_output)
+    set_contradiction_hidden_button(contradictory_html_output, hidden_title_textbox, hidden_content_textbox, hidden_contrad_textbox)
     
-    
+
     disclaimer_text = gr.Markdown(lang_options["繁體中文"]["disclaimer"])
     
     lang.change(
@@ -254,20 +258,23 @@ with gr.Blocks() as demo:
         fn=quick_interface_fn,
         inputs=[title_input, content_input],
         outputs=[output_summary, output_detail, mgp_html_title, mgp_html_output, 
-        contradictory_html_title, contradictory_html_output]
+        contradictory_html_title, contradictory_html_output, 
+        hidden_title_textbox, hidden_content_textbox, hidden_mgp_textbox, hidden_contrad_textbox]
     )
     
     submit_btn.click(
         fn=interface_fn,
         inputs=[title_input, content_input],
         outputs=[output_summary, output_detail, mgp_html_title, mgp_html_output, 
-        contradictory_html_title, contradictory_html_output]
+        contradictory_html_title, contradictory_html_output, 
+        hidden_title_textbox, hidden_content_textbox, hidden_mgp_textbox, hidden_contrad_textbox]
     )
 
     clear_btn.click(
-        fn=lambda: ("", "", "", "", "", "", "", ""),
+        fn=lambda: ("", "", "", "", "", "", "", "", "", "", "", ""),
         outputs=[title_input, content_input, output_summary, output_detail, 
-                 mgp_html_title, mgp_html_output, contradictory_html_title, contradictory_html_output]
+                 mgp_html_title, mgp_html_output, contradictory_html_title, contradictory_html_output, 
+                 hidden_title_textbox, hidden_content_textbox, hidden_mgp_textbox, hidden_contrad_textbox]
     )
 
 
