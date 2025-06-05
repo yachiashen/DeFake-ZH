@@ -59,31 +59,35 @@ def interface_fn(title, content):
     score = 0
     
     title, content = re.sub(r'\s+', '', title), re.sub(r'\s+', '', content)
-    if not isinstance(content, str) or content == "":
-        yield "〔 請輸入新聞內容再進行分析 〕", "", "", "", "", "", "", "", "", ""
+    if not isinstance(content, str) or content == "" or title == "":
+        yield "〔 請輸入新聞標題與新聞內容再進行分析 〕", "", "", "", "", "", "", "", "", ""
         return 
     
     yield "［1/4］正在搜尋 MGP 資料庫...", "", "", "", "", "", title, content, "", ""
     
     ### MGP Part
-    mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_bool, mgp_html_code = update_mgp_part(title, content)
+    mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_search_cnt, mgp_html_code = update_mgp_part(title, content)
     detail = f"\n<h3 style='color: orange;'>MGP 資料搜尋結果：</h3>\n\n"
     detail += mgp_description + "\n\n"
     
-    if bool(mgp_bool):
-        score += 33.333
-        print(f"\n[MGP] : score += 33.333, current score = {score}\n")
+    if bool(mgp_search_cnt):
+        increase = 33.333
+        increase += ((mgp_search_cnt - 3) * 7.5) if increase > 3 else 0
+        score += increase
+        print(f"\n[MGP] : score += {increase:.3f}, current score = {score}\n")
     
     yield "［2/4］ MGP 資料庫比對完成，正在檢查邏輯矛盾...", detail, mgp_html_title_update, mgp_html_output_update, "", "", title, content, mgp_html_code, ""
     
     ### Contradiction Part
-    contrad_html_title_update, contrad_html_output_update, contrad_description, contrad_bool, contrad_html_code = update_contradiction_part(title, content)
+    contrad_html_title_update, contrad_html_output_update, contrad_description, contrad_search_cnt, contrad_html_code = update_contradiction_part(title, content)
     detail += f"\n<h3 style='color: orange;'>三元組搜尋矛盾結果：</h3>\n\n"
     detail += contrad_description + "\n\n"
     
-    if bool(contrad_bool):
-        score += 33.333
-        print(f"\n[CONTRAD] : score += 33.333, current score = {score}\n")
+    if bool(contrad_search_cnt):
+        increase = 33.333
+        increase += ((contrad_search_cnt - 5) * 7.5) if increase > 5 else 0
+        score += increase
+        print(f"\n[CONTRAD] : score += {increase:.3f}, current score = {score}\n")
 
     yield "［3/4］邏輯矛盾比對完成，正在分析標題與內文...", detail, mgp_html_title_update, mgp_html_output_update, contrad_html_title_update, contrad_html_output_update, title, content, mgp_html_code, contrad_html_code
 
@@ -143,13 +147,15 @@ def quick_interface_fn(title, content):
 
 
     ### MGP Part
-    mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_bool, mgp_html_code = update_mgp_part(title, content)
+    mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_search_cnt, mgp_html_code = update_mgp_part(title, content)
     detail = f"\n<h3 style='color: orange;'>MGP 資料搜尋結果：</h3>\n\n"
     detail += mgp_description + "\n\n"
 
-    if bool(mgp_bool):
-        score += 33.333
-        print(f"\n[MGP] : score += 33.333, current score = {score}\n")
+    if bool(mgp_search_cnt):
+        increase = 33.333
+        increase += ((mgp_search_cnt - 3) * 7.5) if increase > 3 else 0
+        score += increase
+        print(f"\n[MGP] : score += {increase:.3f}, current score = {score}\n")
     
     yield "［2/3］ MGP 資料庫比對完成，正在分析標題與內文...", detail, mgp_html_title_update, mgp_html_output_update, "", "", title, content, mgp_html_code, ""
 
