@@ -60,14 +60,14 @@ def interface_fn(title, content):
     
     title, content = re.sub(r'\s+', '', title), re.sub(r'\s+', '', content)
     if not isinstance(content, str) or content == "" or title == "":
-        yield "〔 請輸入新聞標題與新聞內容再進行分析 〕", "", "", "", "", "", "", "", "", ""
+        yield " 🚨\u3000請輸入『標題』與『內文』再進行完整分析\u3000🚨 ", "", "", "", "", "", "", "", "", ""
         return 
     
-    yield "［1/4］正在搜尋 MGP 資料庫...", "", "", "", "", "", title, content, "", ""
+    yield " ［1/4］正在搜尋 MGP 資料庫... ", "", "", "", "", "", title, content, "", ""
     
     ### MGP Part
     mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_search_cnt, mgp_html_code = update_mgp_part(title, content)
-    detail = f"\n<h3 style='color: orange;'>MGP 資料搜尋結果：</h3>\n\n"
+    detail = f"\n<h3 style='color: #FF8F59;'>MGP 資料搜尋結果：</h3>\n\n"
     detail += mgp_description + "\n\n"
     
     if bool(mgp_search_cnt):
@@ -76,11 +76,11 @@ def interface_fn(title, content):
         score += increase
         print(f"\n[MGP] : score += {increase:.3f}, current score = {score}\n")
     
-    yield "［2/4］ MGP 資料庫比對完成，正在檢查邏輯矛盾...", detail, mgp_html_title_update, mgp_html_output_update, "", "", title, content, mgp_html_code, ""
+    yield " ［2/4］ MGP 資料庫比對完成，正在檢查邏輯矛盾... ", detail, mgp_html_title_update, mgp_html_output_update, "", "", title, content, mgp_html_code, ""
     
     ### Contradiction Part
     contrad_html_title_update, contrad_html_output_update, contrad_description, contrad_search_cnt, contrad_html_code = update_contradiction_part(title, content)
-    detail += f"\n<h3 style='color: orange;'>三元組搜尋矛盾結果：</h3>\n\n"
+    detail += f"\n<h3 style='color: #FF8F59;'>三元組搜尋矛盾結果：</h3>\n\n"
     detail += contrad_description + "\n\n"
     
     if bool(contrad_search_cnt):
@@ -89,7 +89,7 @@ def interface_fn(title, content):
         score += increase
         print(f"\n[CONTRAD] : score += {increase:.3f}, current score = {score}\n")
 
-    yield "［3/4］邏輯矛盾比對完成，正在分析標題與內文...", detail, mgp_html_title_update, mgp_html_output_update, contrad_html_title_update, contrad_html_output_update, title, content, mgp_html_code, contrad_html_code
+    yield " ［3/4］邏輯矛盾比對完成，正在分析標題與內文... ", detail, mgp_html_title_update, mgp_html_output_update, contrad_html_title_update, contrad_html_output_update, title, content, mgp_html_code, contrad_html_code
 
     news_sentences, title_dict, sentences_dict, sentence_summary_scores, prob = get_all_scores(title, content)
     print(f"\n[BERT] : prob = {prob * 100}\n")
@@ -120,12 +120,12 @@ def interface_fn(title, content):
 
     summary = update_summary_part(score, sentence_summary_scores)
     
-    detail += "<h3 style='color: orange;'>標題分析：</h3>\n\n"
+    detail += "<h3 style='color: #FF8F59;'>標題分析：</h3>\n\n"
     title_score_dict = title_score_transform(title_dict)
     for k, v in title_score_dict.items():
         detail += f"- {k}{v}\n"
 
-    detail += "\n\n<h3 style='color: orange;'>內文句子分析：</h3>\n"
+    detail += "\n\n<h3 style='color: #FF8F59;'>內文句子分析：</h3>\n"
     for sent in news_sentences:
         detail += f"\n> {sent}\n"
         sentence_score_dict = sentence_score_transform(sentences_dict[sent])
@@ -140,15 +140,15 @@ def quick_interface_fn(title, content):
 
     title, content = re.sub(r'\s+', '', title), re.sub(r'\s+', '', content)
     if not isinstance(content, str) or content == "":
-        yield "〔 請輸入新聞內容再進行分析 〕", "", "", "", "", "", "", "", "", ""
+        yield " 🚨\u3000請輸入『內文』再進行快速分析\u3000🚨 ", "", "", "", "", "", "", "", "", ""
         return 
     
-    yield "［1/4］正在搜尋 MGP 資料庫...", "", "", "", "", "", title, content, "", ""
+    yield " ［1/3］正在搜尋 MGP 資料庫... ", "", "", "", "", "", title, content, "", ""
 
 
     ### MGP Part
     mgp_html_title_update, mgp_html_output_update, mgp_description, mgp_search_cnt, mgp_html_code = update_mgp_part(title, content)
-    detail = f"\n<h3 style='color: orange;'>MGP 資料搜尋結果：</h3>\n\n"
+    detail = f"\n<h3 style='color: #FF8F59;'>MGP 資料搜尋結果：</h3>\n\n"
     detail += mgp_description + "\n\n"
 
     if bool(mgp_search_cnt):
@@ -157,7 +157,7 @@ def quick_interface_fn(title, content):
         score += increase
         print(f"\n[MGP] : score += {increase:.3f}, current score = {score}\n")
     
-    yield "［2/3］ MGP 資料庫比對完成，正在分析標題與內文...", detail, mgp_html_title_update, mgp_html_output_update, "", "", title, content, mgp_html_code, ""
+    yield " ［2/3］ MGP 資料庫比對完成，正在分析標題與內文... ", detail, mgp_html_title_update, mgp_html_output_update, "", "", title, content, mgp_html_code, ""
 
     news_sentences, title_dict, sentences_dict, sentence_summary_scores, prob = get_all_scores(title, content)
     print(f"\n[BERT] : prob = {prob * 100}\n")
@@ -189,12 +189,12 @@ def quick_interface_fn(title, content):
 
     summary = update_summary_part(score, sentence_summary_scores)
     
-    detail += "<h3 style='color: orange;'>標題分析：</h3>\n\n"
+    detail += "<h3 style='color: #FF8F59;'>標題分析：</h3>\n\n"
     title_score_dict = title_score_transform(title_dict)
     for k, v in title_score_dict.items():
         detail += f"- {k}{v}\n"
 
-    detail += "\n\n<h3 style='color: orange;'>內文句子分析：</h3>\n"
+    detail += "\n\n<h3 style='color: #FF8F59;'>內文句子分析：</h3>\n"
     for sent in news_sentences:
         detail += f"\n> {sent}\n"
         sentence_score_dict = sentence_score_transform(sentences_dict[sent])
@@ -206,13 +206,18 @@ def quick_interface_fn(title, content):
 with gr.Blocks() as demo:
     # gr.Markdown("# DeFake-ZH")
     with gr.Row():
-        with gr.Column(scale=5, min_width=400):
-            gr.Markdown('<div align="center"><h1>DeFake-ZH</h1></div>')
-        with gr.Column(scale=1, min_width=150):
-            lang = gr.Dropdown(["繁體中文", "English"], label="", value="繁體中文")
+        with gr.Column():
+            # gr.Markdown('<div align="center"><h1>DeFake-ZH</h1></div>')
+            # gr.Markdown('<div align="center"><h1 style="color: #FF4500;">DeFake-ZH</h1></div>')
+            gr.Markdown('<div align="center"><h1 style="color: #FF8F59; font-size: 48px;">DeFake-ZH</h1></div>')
+            gr.Markdown('<div align="center">輸入一篇新聞標題與內文，系統將判斷真假機率與分析語氣</div>')
+            # title_markdown = gr.Markdown("## 中文假新聞偵測器")
+            # desc_markdown = gr.Markdown("輸入一篇新聞標題與內文，系統將判斷真假機率與分析語氣")
+        # with gr.Column(scale=1, min_width=150):
+        #     lang = gr.Dropdown(["繁體中文", "English"], label="", value="繁體中文")
         
-    title_markdown = gr.Markdown("## 中文假新聞偵測器")
-    desc_markdown = gr.Markdown("輸入一篇新聞標題與內文，系統將判斷真假機率與分析語氣")
+    # title_markdown = gr.Markdown("## 中文假新聞偵測器")
+    # desc_markdown = gr.Markdown("輸入一篇新聞標題與內文，系統將判斷真假機率與分析語氣")
 
     with gr.Row():
         with gr.Column():
@@ -226,7 +231,7 @@ with gr.Blocks() as demo:
 
         with gr.Column():
             output_summary = gr.HTML()
-            with gr.Accordion(label="點我展開查看詳細分析", open=False) as accordion_box:
+            with gr.Accordion(label=" 點我展開查看詳細分析 ", open=False) as accordion_box:
                 output_detail = gr.Markdown()
     
     hidden_title_textbox = gr.Textbox(value = "", visible = False)
@@ -247,18 +252,18 @@ with gr.Blocks() as demo:
 
     disclaimer_text = gr.Markdown(lang_options["繁體中文"]["disclaimer"])
     
-    lang.change(
-        update_labels,
-        inputs=lang,
+    # lang.change(
+    #     update_labels,
+    #     inputs=lang,
 
-        outputs=[
-            title_input, content_input, output_summary,
-            submit_btn, quick_btn, clear_btn,
-            title_markdown, desc_markdown,
-            accordion_box,
-            disclaimer_text
-        ]
-    )
+    #     outputs=[
+    #         title_input, content_input, output_summary,
+    #         submit_btn, quick_btn, clear_btn,
+    #         title_markdown, desc_markdown,
+    #         accordion_box,
+    #         disclaimer_text
+    #     ]
+    # )
 
     quick_btn.click(
         fn=quick_interface_fn,

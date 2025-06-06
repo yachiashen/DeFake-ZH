@@ -251,14 +251,14 @@ def update_mgp_part(title, content):
     
     mgp_html_title_code = f"""
 <div align="center">
-    <h1>MGP資料庫搜尋</h1>
+    <h1>MGP 資料庫搜尋</h1>
 </div>
 """
     if len(sentences_pairs) == 0:
       mgp_html_title_code = ""
       mgp_html_code = ""
 
-    description = f"- 共有{len(sentences_pairs)}組句子相似" if len(sentences_pairs) > 0 else "- MPG 資料庫無搜尋到任何資料"
+    description = f"- 共有 {len(sentences_pairs)} 組句子相似" if len(sentences_pairs) > 0 else "- MPG 資料庫無搜尋到任何資料"
     return gr.update(value = mgp_html_title_code), gr.update(value = mgp_html_code), description, len(sentences_pairs), mgp_html_code
 
 def set_mgp_hidden_button(mgp_html_output, hidden_title_textbox, hidden_content_textbox, html_textbox):
@@ -353,7 +353,7 @@ def update_contradiction_part(title, content):
 
     contradictory_html_title_code = f"""
 <div align="center">
-    <h1>矛盾比對</h1>
+    <h1>語意矛盾分析</h1>
 </div>
 """
     if trp_cnt == 0:
