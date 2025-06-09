@@ -72,7 +72,7 @@ def interface_fn(title, content):
     
     if bool(mgp_search_cnt):
         increase = 33.333
-        increase += ((mgp_search_cnt - 3) * 7.5) if increase > 3 else 0
+        increase += ((mgp_search_cnt - 3) * 7.5) if mgp_search_cnt > 3 else 0
         score += increase
         print(f"\n[MGP] : score += {increase:.3f}, current score = {score}\n")
     
@@ -85,7 +85,7 @@ def interface_fn(title, content):
     
     if bool(contrad_search_cnt):
         increase = 33.333
-        increase += ((contrad_search_cnt - 5) * 7.5) if increase > 5 else 0
+        increase += ((contrad_search_cnt - 5) * 7.5) if contrad_search_cnt > 5 else 0
         score += increase
         print(f"\n[CONTRAD] : score += {increase:.3f}, current score = {score}\n")
 
@@ -153,7 +153,7 @@ def quick_interface_fn(title, content):
 
     if bool(mgp_search_cnt):
         increase = 33.333
-        increase += ((mgp_search_cnt - 3) * 7.5) if increase > 3 else 0
+        increase += ((mgp_search_cnt - 3) * 7.5) if mgp_search_cnt > 3 else 0
         score += increase
         print(f"\n[MGP] : score += {increase:.3f}, current score = {score}\n")
     
