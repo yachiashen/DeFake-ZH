@@ -6,12 +6,27 @@ dependencies:
   - python=3.12.9
   - pip
   - pip:
+      # --- Core numerics / data ---
       - numpy
       - pandas
+      - scipy
       - scikit-learn
-      - jieba
-      - torch
-      - torchvision
-      - torchaudio
-      - transformers
       - tqdm
+      - pyyaml
+
+      # --- PyTorch stack ---
+      - torch==2.6.0
+      - torchvision==0.21.0
+      - torchaudio==2.6.0
+
+      # --- NLP / LLM ---
+      - transformers==4.50.0
+      - datasets
+      - accelerate
+      - peft
+      - sentencepiece
+      - sentence-transformers
+      - faiss-cpu
+      - jieba
+      - opencc
+      - regex
