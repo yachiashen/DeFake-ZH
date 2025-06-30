@@ -1,65 +1,57 @@
-# data 資料夾說明
+<p align="center">
+  <a href="README.md"><img src="https://img.shields.io/badge/lang-English-blue.svg"></a>
+  <a href="README.zh-TW.md"><img src="https://img.shields.io/badge/lang-繁體中文-green.svg"></a>
+</p>
 
-本資料夾用於儲存本專案所有與資料處理相關的內容，包含原始資料、預處理結果、特徵向量與模型輸入格式等中介檔案。
+# Data Directory Description
+
+This directory contains all project-related data, including raw inputs, preprocessing results, extracted feature vectors, and intermediate files prepared for model training and evaluation.
 
 ---
 
-## 資料夾結構
-
+## Directory Structure
 ```bash
 data/
-├── db/          # 以資料庫形式儲存的原始或處理後資料
-├── features/    # 儲存已抽取的特徵向量（.npy）
-├── processed/   # 處理後可直接訓練的資料（如分割後的 train/val/test）
-└── raw/         # 原始 CSV 或未清洗的輸入資料
+├── db/          # Reference databases (.json, .pkl, .faiss)
+├── features/    # Extracted feature vectors (.npy)
+├── processed/   # Cleaned and split datasets (train/val/test)
+└── raw/         # Original CSV/JSON input data
 ```
 
 ---
 
-## 📌 各類資料說明
+## 📌 Data Types
 
-### 原始資料（raw data）
+### Raw Data
+- **Source**: collected manually or via crawlers from Taiwanese news outlets and fact-checking organizations  
+- **Format**: CSV / JSON (uncleaned)  
+- **Usage**: input for preprocessing  
 
-- 來源：人工收集、爬蟲
-- 格式：為 CSV 或 JSON，未經清洗或轉換
-- 用途：作為後續資料處理的輸入
+### Processed Data
+- Cleaned and segmented results, with possible train/val/test splits  
+- Ready for direct use in model training  
 
----
+### Feature Vectors
+- Embeddings from models (e.g., MacBERT, BGEM3, Text2Vec)  
+- Format: `.npy` files, including both input features and labels  
+  - Examples: `bert_X_train.npy`, `bgem3_title_X_val.npy`, `bert_y_test.npy`  
 
-### 處理後資料（processed data）
-
-- 含資料清理、斷詞、標記處理等步驟後的結果
-- 可能已完成訓練/驗證/測試分割
-- 可直接作為模型輸入，提升訓練效率與穩定性
-
----
-
-### 特徵向量（features）
-
-- 各種模型（如 BERT、BGEM3）輸出之數值向量結果
-- 格式為 `.npy`
-- 分別儲存輸入特徵與對應標籤，例如：
-  - `bert_X_train.npy`
-  - `bgem3_title_X_val.npy`
-  - `bert_y_test.npy`
+### Databases
+- Reference collections of news and fact-checking entries  
+- Formats: `.json` (raw reference), `.pkl` (indexed DB)  
+- Two main sets:  
+  - **all** → database built from all reference news  
+  - **mgp** → database built from MyGoPen (MGP) fact-checking data  
 
 ---
 
-### 資料庫（db）
-- 儲存參考新聞與資料庫
-- 參考新聞格式為 `.json`、資料庫格格式為 `.pkl`
-- 資料庫共有兩個
-  - `all`：參考新聞建立的資料庫
-  - `mgp`：MGP資料建立的資料庫
-
----
-
-## 資料處理流程
-
-資料處理遵循以下順序進行：
+## Data Processing Pipeline
 
 ```bash
-原始資料 → 清理處理 → 特徵抽取 → 模型輸入格式
+Raw Data → Preprocessing → Feature Extraction → Model Input
 ```
 
-- 每一步驟產出儲存為可重用檔案，避免重複處理
+Each step produces reusable files to avoid redundant computation.
+
+⚠️ Due to size and copyright restrictions, the dataset itself is **not included** in this repository.  
+Users may collect comparable data from the listed news sources and fact-checking organizations, or contact us for further information regarding data access.
