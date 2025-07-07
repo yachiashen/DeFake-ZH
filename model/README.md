@@ -22,7 +22,7 @@
 
 ### **task**
 
-- **模型頁面**：[dropbox/Chinese-Fake-News-Detection](https://www.dropbox.com/scl/fo/jadxfd0noq6h6ojkzlh63/AMdz_ykissSpZTsibaEULlQ?rlkey=bp6vbma8x6x72yc8dwgrr0oed&st=lj6x5wto&dl=0)    
+- **模型頁面**：[dropbox](https://www.dropbox.com/scl/fo/huar4b738lyxk68kvz4p4/AEUsutWinEqVW8O7tXf8LTg?rlkey=ciltt4arjj3rcoz7clw19emer&st=1obbconj&dl=0)    
 - **下載方式**：請將網頁內的三個模型權重均下載下來，並放置於  ``task`` 資料夾內。 
 
 ---
